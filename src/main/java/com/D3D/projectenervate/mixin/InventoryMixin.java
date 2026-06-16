@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -34,6 +35,7 @@ public abstract class InventoryMixin {
             return;
         }
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
         projectenervate$adaptiveInventoryMerged = AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {
@@ -63,6 +65,7 @@ public abstract class InventoryMixin {
             return;
         }
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
         projectenervate$adaptiveInventoryMerged = AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {
@@ -95,6 +98,7 @@ public abstract class InventoryMixin {
             return;
         }
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
         AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {

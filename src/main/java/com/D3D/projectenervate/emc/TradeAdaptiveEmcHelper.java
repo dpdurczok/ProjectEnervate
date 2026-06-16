@@ -40,6 +40,13 @@ public final class TradeAdaptiveEmcHelper {
         BigDecimal paidEmc = projectenervate$getPaidEmc(container, offer);
 
         AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(outputStack, paidEmc);
+
+        if (paidEmc.signum() > 0) {
+            ProjectEnervateSourceHelper.markKnown(
+                    outputStack,
+                    ProjectEnervateSourceHelper.SOURCE_TRADE
+            );
+        }
     }
 
     private static BigDecimal projectenervate$getPaidEmc(
@@ -97,7 +104,7 @@ public final class TradeAdaptiveEmcHelper {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal singlePaymentValue = AdaptiveEmcHelper.getSingleSellValueDecimal(actualPaymentStack);
+        BigDecimal singlePaymentValue = AdaptiveEmcHelper.getSingleMergeValueDecimal(actualPaymentStack);
 
         if (singlePaymentValue.signum() <= 0) {
             return BigDecimal.ZERO;

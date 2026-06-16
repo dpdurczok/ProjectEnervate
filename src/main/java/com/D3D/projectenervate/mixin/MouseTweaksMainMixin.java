@@ -3,6 +3,7 @@ package com.D3D.projectenervate.mixin;
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
+import com.D3D.projectenervate.emc.TransmutationBurnHelper;
 import java.math.BigInteger;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.gui.GUITransmutation;
@@ -157,8 +158,6 @@ public abstract class MouseTweaksMainMixin {
             return;
         }
 
-        markStackKnown(inventorySlot.getItem());
-
         ItemStack wantedStack = inventorySlot.getItem();
 
         int matchingOutputSlot = findMatchingOutputSlot(menu, wantedStack);
@@ -216,38 +215,24 @@ public abstract class MouseTweaksMainMixin {
             return;
         }
 
-        if (targetSlot.hasItem()) {
-            markStackKnown(targetSlot.getItem());
-        }
-
         click(minecraft, menu, outputSlotId, 1, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (menu.getCarried().isEmpty()) {
             return;
         }
 
         click(minecraft, menu, targetInventorySlotId, 1, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (!menu.getCarried().isEmpty()) {
             int fallbackSlot = findInventoryTargetSlot(menu, menu.getCarried());
 
             if (fallbackSlot >= 0) {
-                Slot fallback = menu.slots.get(fallbackSlot);
-
-                if (fallback.hasItem()) {
-                    markStackKnown(fallback.getItem());
-                }
-
                 click(minecraft, menu, fallbackSlot, 0, ClickType.PICKUP);
-                markCarriedKnown(menu);
             }
         }
 
         if (!menu.getCarried().isEmpty()) {
             click(minecraft, menu, outputSlotId, 0, ClickType.PICKUP);
-            markCarriedKnown(menu);
         }
     }
 
@@ -279,23 +264,16 @@ public abstract class MouseTweaksMainMixin {
         Slot targetSlot = menu.slots.get(targetSlotId);
         boolean targetWasEmpty = !targetSlot.hasItem();
 
-        if (targetSlot.hasItem()) {
-            markStackKnown(targetSlot.getItem());
-        }
-
         click(minecraft, menu, outputSlotId, 1, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (menu.getCarried().isEmpty()) {
             return;
         }
 
         click(minecraft, menu, targetSlotId, targetWasEmpty ? 0 : 1, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (!menu.getCarried().isEmpty()) {
             click(minecraft, menu, outputSlotId, 0, ClickType.PICKUP);
-            markCarriedKnown(menu);
         }
     }
 
@@ -310,7 +288,7 @@ public abstract class MouseTweaksMainMixin {
             return;
         }
 
-        markStackKnown(sourceSlot.getItem());
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(sourceSlot.getItem());
 
         ItemStack sourceStack = sourceSlot.getItem();
 
@@ -318,35 +296,35 @@ public abstract class MouseTweaksMainMixin {
             return;
         }
 
-        ItemStack oneItem = sourceStack.copy();
-        oneItem.setCount(1);
-
-        BigInteger emcToAdd = AdaptiveEmcHelper.getStackSellValue(oneItem, 1);
-
-        if (emcToAdd.signum() <= 0) {
+        if (!TransmutationBurnHelper.shouldHandleAsBurnable(sourceStack)) {
             return;
         }
 
         ProjectEnervateTransmutationAccess access =
                 (ProjectEnervateTransmutationAccess) menu.transmutationInventory;
 
-        if (!access.projectenervate$canAcceptEmc(emcToAdd)) {
+        if (TransmutationBurnHelper.isEmcHolder(sourceStack)
+                && access.projectenervate$canStoreEmcHolder(sourceStack)) {
+            click(minecraft, menu, playerSlotId, 0, ClickType.QUICK_MOVE);
+            return;
+        }
+
+        BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
+
+        if (TransmutationBurnHelper.getMaxBurnableItems(freeEmc, sourceStack, 1) <= 0) {
             return;
         }
 
         click(minecraft, menu, playerSlotId, 0, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (menu.getCarried().isEmpty()) {
             return;
         }
 
         click(minecraft, menu, PROJECTE_CONSUME_SLOT, 1, ClickType.PICKUP);
-        markCarriedKnown(menu);
 
         if (!menu.getCarried().isEmpty()) {
             click(minecraft, menu, playerSlotId, 0, ClickType.PICKUP);
-            markCarriedKnown(menu);
         }
     }
 
@@ -359,8 +337,6 @@ public abstract class MouseTweaksMainMixin {
             }
 
             ItemStack existing = slot.getItem();
-
-            markStackKnown(existing);
 
             if (!AdaptiveEmcHelper.canMergeIgnoringAdaptiveEmc(existing, stackToInsert)) {
                 continue;
@@ -383,19 +359,15 @@ public abstract class MouseTweaksMainMixin {
     }
 
     private static void markAllTransmutationVisibleStacksKnown(TransmutationContainer menu) {
-        markCarriedKnown(menu);
+        for (int i = PROJECTE_FIRST_OUTPUT_SLOT; i <= PROJECTE_LAST_OUTPUT_SLOT; i++) {
+            Slot slot = menu.slots.get(i);
 
-        for (Slot slot : menu.slots) {
             if (!slot.hasItem()) {
                 continue;
             }
 
             markStackKnown(slot.getItem());
         }
-    }
-
-    private static void markCarriedKnown(AbstractContainerMenu menu) {
-        markStackKnown(menu.getCarried());
     }
 
     private static void markStackKnown(ItemStack stack) {

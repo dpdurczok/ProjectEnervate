@@ -18,7 +18,7 @@ public final class CraftingAdaptiveEmcHelper {
         CraftingTakeAllocation allocation = createAllocation(craftSlots, craftedStack);
 
         if (allocation == null) {
-            AdaptiveEmcValues.remove(craftedStack);
+            AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(craftedStack, BigDecimal.ZERO);
             return;
         }
 
@@ -30,7 +30,7 @@ public final class CraftingAdaptiveEmcHelper {
         CURRENT_TAKE_ALLOCATION.set(allocation);
 
         if (allocation == null) {
-            AdaptiveEmcValues.remove(craftedStack);
+            AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(craftedStack, BigDecimal.ZERO);
             return;
         }
 

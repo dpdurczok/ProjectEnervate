@@ -29,6 +29,6 @@ public final class ProjectEnervate {
 
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onBlockDrops);
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onLivingDrops);
-        NeoForge.EVENT_BUS.addListener(KnownSourceEvents::onLevelTickPost);
+        NeoForge.EVENT_BUS.addListener(KnownSourceEvents::onItemToss);
     }
 }

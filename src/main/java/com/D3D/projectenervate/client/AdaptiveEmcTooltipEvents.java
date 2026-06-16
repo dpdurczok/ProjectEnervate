@@ -26,6 +26,11 @@ public final class AdaptiveEmcTooltipEvents {
         ItemStack stack = event.getItemStack();
 
         AdaptiveEmcValues.get(stack).ifPresent(singleValue -> {
+            if (singleValue.signum() <= 0) {
+                applyCorruptedTooltip(event.getToolTip());
+                return;
+            }
+
             BigDecimal stackValue = singleValue
                     .multiply(BigDecimal.valueOf(stack.getCount()))
                     .setScale(2, RoundingMode.HALF_UP);
@@ -70,6 +75,33 @@ public final class AdaptiveEmcTooltipEvents {
                 tooltip.add(stackEmcLine);
             }
         });
+    }
+
+    private static void applyCorruptedTooltip(List<Component> tooltip) {
+        Component corruptedLine = Component.literal("EMC: CORRUPTED")
+                .withStyle(ChatFormatting.RED);
+
+        boolean replacedEmc = false;
+
+        for (int i = 0; i < tooltip.size(); i++) {
+            String plainText = tooltip.get(i).getString();
+
+            if (plainText.startsWith("ProjectEnervate Adaptive EMC:")
+                    || plainText.startsWith("Stack EMC:")) {
+                tooltip.remove(i);
+                i--;
+                continue;
+            }
+
+            if (plainText.startsWith("EMC:")) {
+                tooltip.set(i, corruptedLine);
+                replacedEmc = true;
+            }
+        }
+
+        if (!replacedEmc) {
+            tooltip.add(corruptedLine);
+        }
     }
 
     private static String formatNumber(BigDecimal value) {

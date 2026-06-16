@@ -64,7 +64,7 @@ public abstract class AbstractFurnaceBlockEntityMixin {
 
             FurnaceSnapshot snapshot = PROJECTENERVATE_FURNACE_SNAPSHOT.get();
 
-            if (snapshot == null || snapshot.inputBudget().signum() <= 0) {
+            if (snapshot == null) {
                 return;
             }
 

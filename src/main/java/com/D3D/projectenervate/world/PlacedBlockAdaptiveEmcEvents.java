@@ -2,6 +2,7 @@ package com.D3D.projectenervate.world;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcValues;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashMap;
@@ -57,12 +58,27 @@ public final class PlacedBlockAdaptiveEmcEvents {
 
         Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
 
-        if (adaptiveValue.isPresent() && adaptiveValue.get().signum() > 0) {
+        if (adaptiveValue.isPresent()) {
             PENDING_PLACEMENTS.put(
                     event.getEntity().getUUID(),
                     new PendingPlacement(
                             expectedPlacedItem,
                             adaptiveValue.get(),
+                            true,
+                            level.getGameTime()
+                    )
+            );
+            return;
+        }
+
+        if (!ProjectEnervateSourceHelper.hasSourceMarker(stack)
+                && !AdaptiveEmcValues.has(stack)
+                && ProjectEnervateSourceHelper.hasBaseEmc(stack)) {
+            PENDING_PLACEMENTS.put(
+                    event.getEntity().getUUID(),
+                    new PendingPlacement(
+                            expectedPlacedItem,
+                            BigDecimal.ZERO,
                             true,
                             level.getGameTime()
                     )
@@ -153,6 +169,9 @@ public final class PlacedBlockAdaptiveEmcEvents {
         PlacedBlockAdaptiveEmcData.Entry entry = storedEntry.get();
 
         if (entry.emc().signum() <= 0) {
+            if (entry.alwaysApply()) {
+                projectenervate$applyUnknownSourceToDrops(event.getDrops());
+            }
             return;
         }
 
@@ -295,6 +314,18 @@ public final class PlacedBlockAdaptiveEmcEvents {
                     dropStack,
                     proposedDropStackEmc
             );
+        }
+    }
+
+    private static void projectenervate$applyUnknownSourceToDrops(List<ItemEntity> drops) {
+        for (ItemEntity itemEntity : drops) {
+            ItemStack dropStack = itemEntity.getItem();
+
+            if (dropStack.isEmpty()) {
+                continue;
+            }
+
+            ProjectEnervateSourceHelper.markUnknownSource(dropStack);
         }
     }
 

@@ -1,8 +1,9 @@
 package com.D3D.projectenervate.mixin;
 
+import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
-import moze_intel.projecte.api.capabilities.PECapabilities;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
 import moze_intel.projecte.gameObjs.items.Tome;
@@ -50,7 +51,7 @@ public abstract class TransmutationContainerMixin {
 
         ItemStack slotStack = slot.getItem();
 
-        if (slotStack.getCapability(PECapabilities.EMC_HOLDER_ITEM_CAPABILITY) != null) {
+        if (shouldLetProjectEStoreEmcHolder(slotStack)) {
             return;
         }
 
@@ -58,12 +59,12 @@ public abstract class TransmutationContainerMixin {
             return;
         }
 
-        if (!AdaptiveEmcHelper.hasAdaptiveValue(slotStack)) {
+        if (!TransmutationBurnHelper.shouldHandleAsBurnable(slotStack)) {
             return;
         }
 
-        if (!AdaptiveEmcHelper.hasPositiveSellValue(slotStack)) {
-            cir.setReturnValue(ItemStack.EMPTY);
+        if (ProjectEnervateSourceHelper.hasKnownSource(slotStack)
+                && !AdaptiveEmcHelper.hasAdaptiveValue(slotStack)) {
             return;
         }
 
@@ -98,6 +99,10 @@ public abstract class TransmutationContainerMixin {
 
         ItemStack slotStack = slot.getItem();
 
+        if (shouldLetProjectEStoreEmcHolder(slotStack)) {
+            return;
+        }
+
         if (!TransmutationBurnHelper.shouldHandleAsBurnable(slotStack)) {
             return;
         }
@@ -112,18 +117,16 @@ public abstract class TransmutationContainerMixin {
             CallbackInfoReturnable<ItemStack> cir
     ) {
         ItemStack burnedStack = slotStack.copy();
-        int burned = TransmutationBurnHelper.burnFromStack(
+        TransmutationBurnHelper.BurnResult result = TransmutationBurnHelper.burnFromStackWithResult(
                 transmutationInventory,
                 slotStack,
                 slotStack.getCount()
         );
 
-        if (burned <= 0) {
+        if (!result.changed()) {
             cir.setReturnValue(ItemStack.EMPTY);
             return;
         }
-
-        burnedStack.setCount(burned);
 
         if (slotStack.isEmpty()) {
             slot.set(ItemStack.EMPTY);
@@ -131,6 +134,18 @@ public abstract class TransmutationContainerMixin {
             slot.setChanged();
         }
 
-        cir.setReturnValue(burnedStack);
+        if (result.itemsConsumed() > 0) {
+            burnedStack.setCount(result.itemsConsumed());
+            cir.setReturnValue(burnedStack);
+        } else {
+            cir.setReturnValue(ItemStack.EMPTY);
+        }
+    }
+
+    @Unique
+    private boolean shouldLetProjectEStoreEmcHolder(ItemStack stack) {
+        return TransmutationBurnHelper.isEmcHolder(stack)
+                && ((ProjectEnervateTransmutationAccess) transmutationInventory)
+                        .projectenervate$canStoreEmcHolder(stack);
     }
 }

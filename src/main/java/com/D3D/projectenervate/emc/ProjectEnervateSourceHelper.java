@@ -20,11 +20,12 @@ public final class ProjectEnervateSourceHelper {
     public static final String SOURCE_LIVING_DROP = "living_drop";
     public static final String SOURCE_UNKNOWN_MINIMUM = "unknown_minimum";
     public static final String SOURCE_CRAFTING = "crafting";
+    public static final String SOURCE_TRADE = "trade";
     public static final String SOURCE_PLAYER_INVENTORY = "player_inventory";
     public static final String SOURCE_PLAYER_PICKUP = "player_pickup";
     public static final String SOURCE_CREATIVE_OR_COMMAND = "creative_or_command";
 
-    private static final BigDecimal UNKNOWN_SOURCE_SINGLE_ITEM_EMC = BigDecimal.ONE;
+    private static final BigDecimal UNKNOWN_SOURCE_SINGLE_ITEM_EMC = BigDecimal.ZERO;
 
     private ProjectEnervateSourceHelper() {
     }
@@ -34,14 +35,7 @@ public final class ProjectEnervateSourceHelper {
             return false;
         }
 
-        if (AdaptiveEmcValues.has(stack)) {
-            return true;
-        }
-
-        CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
-        CompoundTag tag = customData.copyTag();
-
-        return tag.contains(TAG_SOURCE);
+        return hasSourceMarker(stack) || AdaptiveEmcValues.has(stack);
     }
 
     public static void markKnown(ItemStack stack, String source) {
@@ -116,6 +110,14 @@ public final class ProjectEnervateSourceHelper {
             return false;
         }
 
+        return markUnknownSource(stack);
+    }
+
+    public static boolean markUnknownSource(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
         if (isProtectedProjectEItem(stack)) {
             return false;
         }
@@ -126,13 +128,25 @@ public final class ProjectEnervateSourceHelper {
             return false;
         }
 
-        BigDecimal proposedStackEmc = UNKNOWN_SOURCE_SINGLE_ITEM_EMC
-                .multiply(BigDecimal.valueOf(stack.getCount()));
-
-        AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(stack, proposedStackEmc);
+        AdaptiveEmcValues.setExact(stack, UNKNOWN_SOURCE_SINGLE_ITEM_EMC);
         markKnown(stack, SOURCE_UNKNOWN_MINIMUM);
 
         return true;
+    }
+
+    public static boolean hasBaseEmc(ItemStack stack) {
+        return AdaptiveEmcOutputHelper.getBaseSingleEmc(stack).signum() > 0;
+    }
+
+    public static boolean hasSourceMarker(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag tag = customData.copyTag();
+
+        return tag.contains(TAG_SOURCE);
     }
 
     private static boolean isProtectedProjectEItem(ItemStack stack) {

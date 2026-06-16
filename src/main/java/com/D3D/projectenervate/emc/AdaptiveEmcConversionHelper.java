@@ -56,7 +56,7 @@ public final class AdaptiveEmcConversionHelper {
 
         if (inputBudget == null || inputBudget.signum() <= 0) {
             for (ItemStack output : outputs) {
-                AdaptiveEmcValues.remove(output);
+                AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(output, BigDecimal.ZERO);
             }
             return;
         }

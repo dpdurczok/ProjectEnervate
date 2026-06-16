@@ -46,7 +46,7 @@ public final class PlacedBlockAdaptiveEmcData extends SavedData {
                     BigDecimal value = new BigDecimal(entryTag.getString("emc"));
                     boolean alwaysApply = entryTag.getBoolean("alwaysApply");
 
-                    if (value.signum() > 0) {
+                    if (value.signum() >= 0) {
                         data.valuesByPos.put(posLong, new Entry(value, alwaysApply));
                     }
                 } else {
@@ -54,7 +54,7 @@ public final class PlacedBlockAdaptiveEmcData extends SavedData {
                     // values[pos] = "12.5"
                     BigDecimal value = new BigDecimal(valuesTag.getString(key));
 
-                    if (value.signum() > 0) {
+                    if (value.signum() >= 0) {
                         data.valuesByPos.put(posLong, new Entry(value, true));
                     }
                 }
@@ -72,7 +72,7 @@ public final class PlacedBlockAdaptiveEmcData extends SavedData {
         for (Map.Entry<Long, Entry> mapEntry : valuesByPos.entrySet()) {
             Entry entry = mapEntry.getValue();
 
-            if (entry.emc().signum() <= 0) {
+            if (entry.emc().signum() < 0) {
                 continue;
             }
 
@@ -88,7 +88,7 @@ public final class PlacedBlockAdaptiveEmcData extends SavedData {
     }
 
     public void put(BlockPos pos, BigDecimal value, boolean alwaysApply) {
-        if (value == null || value.signum() <= 0) {
+        if (value == null || value.signum() < 0) {
             remove(pos);
             return;
         }

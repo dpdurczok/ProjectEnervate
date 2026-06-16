@@ -1,7 +1,6 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
-import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
 import java.math.BigInteger;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
@@ -39,7 +38,7 @@ public abstract class SlotConsumeMixin {
         BigInteger freeEmc =
                 ((ProjectEnervateTransmutationAccess) inv).projectenervate$getFreeStarEmc();
 
-        return AdaptiveEmcHelper.getMaxItemsThatFit(freeEmc, stack) > 0;
+        return TransmutationBurnHelper.getMaxBurnableItems(freeEmc, stack, stack.getCount()) > 0;
     }
 
     @Overwrite
@@ -54,9 +53,10 @@ public abstract class SlotConsumeMixin {
             return;
         }
 
-        int burned = TransmutationBurnHelper.burnFromStack(inv, stack, stack.getCount());
+        TransmutationBurnHelper.BurnResult result =
+                TransmutationBurnHelper.burnFromStackWithResult(inv, stack, stack.getCount());
 
-        if (burned > 0) {
+        if (result.changed()) {
             ((Slot) (Object) this).setChanged();
         }
     }

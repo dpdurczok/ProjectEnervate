@@ -19,10 +19,8 @@ public final class AdaptiveEmcOutputHelper {
             return;
         }
 
-        ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
-
         if (proposedAdaptiveStackEmc == null || proposedAdaptiveStackEmc.signum() <= 0) {
-            AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.markUnknownSource(outputStack);
             return;
         }
 
@@ -42,6 +40,7 @@ public final class AdaptiveEmcOutputHelper {
 
         if (proposedAdaptiveStackEmc.compareTo(baseStackEmc) >= 0) {
             AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
             return;
         }
 
@@ -52,11 +51,12 @@ public final class AdaptiveEmcOutputHelper {
         );
 
         if (adaptivePerItem.signum() <= 0) {
-            AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.markUnknownSource(outputStack);
             return;
         }
 
         AdaptiveEmcValues.setExact(outputStack, adaptivePerItem);
+        ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
     }
 
     public static BigDecimal getBaseStackEmc(ItemStack stack) {
@@ -125,7 +125,7 @@ public final class AdaptiveEmcOutputHelper {
 
         Optional<BigDecimal> value = AdaptiveEmcValues.get(from);
 
-        if (value.isPresent() && value.get().signum() > 0) {
+        if (value.isPresent()) {
             AdaptiveEmcValues.setExact(to, value.get());
         } else {
             AdaptiveEmcValues.remove(to);

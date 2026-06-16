@@ -3,12 +3,14 @@ package com.D3D.projectenervate.emc;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.util.Optional;
 import moze_intel.projecte.api.proxy.IEMCProxy;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 public final class AdaptiveEmcHelper {
+    private static final BigDecimal INTEGER_ROUNDING_TOLERANCE = new BigDecimal("0.000001");
 
     private AdaptiveEmcHelper() {
     }
@@ -22,8 +24,17 @@ public final class AdaptiveEmcHelper {
             return BigDecimal.ZERO;
         }
 
-        return AdaptiveEmcValues.get(stack)
-                .orElseGet(() -> BigDecimal.valueOf(IEMCProxy.INSTANCE.getSellValue(stack)));
+        Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
+
+        if (adaptiveValue.isPresent()) {
+            return adaptiveValue.get();
+        }
+
+        if (!ProjectEnervateSourceHelper.hasSourceMarker(stack)) {
+            return BigDecimal.ZERO;
+        }
+
+        return BigDecimal.valueOf(IEMCProxy.INSTANCE.getSellValue(stack));
     }
 
     public static boolean hasPositiveSellValue(ItemStack stack) {
@@ -45,14 +56,30 @@ public final class AdaptiveEmcHelper {
 
         BigDecimal singleValue = getSingleSellValueDecimal(stack);
 
+        return getStackSellValue(singleValue, count);
+    }
+
+    public static BigInteger getStackSellValue(BigDecimal singleValue, int count) {
+        if (count <= 0) {
+            return BigInteger.ZERO;
+        }
+
         if (singleValue.compareTo(BigDecimal.ZERO) <= 0) {
             return BigInteger.ZERO;
         }
 
-        return singleValue
-                .multiply(BigDecimal.valueOf(count))
+        BigDecimal totalValue = singleValue.multiply(BigDecimal.valueOf(count));
+        BigInteger flooredValue = totalValue
                 .setScale(0, RoundingMode.DOWN)
                 .toBigInteger();
+
+        BigDecimal fractionalValue = totalValue.subtract(new BigDecimal(flooredValue));
+
+        if (fractionalValue.compareTo(BigDecimal.ONE.subtract(INTEGER_ROUNDING_TOLERANCE)) >= 0) {
+            return flooredValue.add(BigInteger.ONE);
+        }
+
+        return flooredValue;
     }
 
     public static int getMaxItemsThatFit(BigInteger freeEmc, ItemStack stack) {
@@ -62,6 +89,14 @@ public final class AdaptiveEmcHelper {
 
         BigDecimal singleValue = getSingleSellValueDecimal(stack);
 
+        return getMaxItemsThatFit(freeEmc, singleValue, stack.getCount());
+    }
+
+    public static int getMaxItemsThatFit(BigInteger freeEmc, BigDecimal singleValue, int maxCount) {
+        if (freeEmc.signum() <= 0 || maxCount <= 0) {
+            return 0;
+        }
+
         if (singleValue.compareTo(BigDecimal.ZERO) <= 0) {
             return 0;
         }
@@ -70,10 +105,10 @@ public final class AdaptiveEmcHelper {
                 .divide(singleValue, 0, RoundingMode.DOWN);
 
         if (max.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
-            return stack.getCount();
+            return maxCount;
         }
 
-        return Math.min(stack.getCount(), max.intValue());
+        return Math.min(maxCount, max.intValue());
     }
 
     public static boolean canMergeIgnoringAdaptiveEmc(ItemStack existing, ItemStack incoming) {
@@ -96,7 +131,7 @@ public final class AdaptiveEmcHelper {
             return false;
         }
 
-        if (!AdaptiveEmcValues.has(existing) && !AdaptiveEmcValues.has(incoming)) {
+        if (!hasMergeRelevantEmc(existing) && !hasMergeRelevantEmc(incoming)) {
             return false;
         }
 
@@ -233,8 +268,8 @@ public final class AdaptiveEmcHelper {
     }
 
     private static void redistributeAdaptiveEmc(ItemStack existing, ItemStack incoming, int movedCount) {
-        BigDecimal existingEach = getSingleSellValueDecimal(existing);
-        BigDecimal incomingEach = getSingleSellValueDecimal(incoming);
+        BigDecimal existingEach = getSingleMergeValueDecimal(existing);
+        BigDecimal incomingEach = getSingleMergeValueDecimal(incoming);
 
         BigDecimal existingTotal = existingEach.multiply(BigDecimal.valueOf(existing.getCount()));
         BigDecimal incomingMovedTotal = incomingEach.multiply(BigDecimal.valueOf(movedCount));
@@ -249,6 +284,30 @@ public final class AdaptiveEmcHelper {
                         RoundingMode.HALF_UP
                 );
 
+        BigDecimal baseEach = AdaptiveEmcOutputHelper.getBaseSingleEmc(existing);
+
+        if (baseEach.signum() > 0 && newEach.compareTo(baseEach) >= 0) {
+            AdaptiveEmcValues.remove(existing);
+            ProjectEnervateSourceHelper.markKnown(
+                    existing,
+                    ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION
+            );
+            return;
+        }
+
         AdaptiveEmcValues.setExact(existing, newEach);
+    }
+
+    public static BigDecimal getSingleMergeValueDecimal(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        return AdaptiveEmcValues.get(stack)
+                .orElseGet(() -> AdaptiveEmcOutputHelper.getBaseSingleEmc(stack));
+    }
+
+    private static boolean hasMergeRelevantEmc(ItemStack stack) {
+        return AdaptiveEmcValues.has(stack) || ProjectEnervateSourceHelper.hasSourceMarker(stack);
     }
 }

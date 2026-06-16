@@ -109,6 +109,27 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
         return projectenervate$getFreeStarEmc().compareTo(value) >= 0;
     }
 
+    @Override
+    public boolean projectenervate$canStoreEmcHolder(ItemStack stack) {
+        if (projectenervate$getEmcHolder(stack) == null) {
+            return false;
+        }
+
+        for (int slotIndex = 0; slotIndex < inputLocks.getSlots(); slotIndex++) {
+            if (slotIndex == PROJECTENERVATE_LOCK_INDEX) {
+                continue;
+            }
+
+            ItemStack remainder = inputLocks.insertItem(slotIndex, stack.copy(), true);
+
+            if (remainder.getCount() < stack.getCount()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Add EMC into left-side EMC-holder items only.
      * No leftover EMC is stored globally.
