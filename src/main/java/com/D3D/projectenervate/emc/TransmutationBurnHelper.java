@@ -36,7 +36,9 @@ public final class TransmutationBurnHelper {
         if (inventory == null || sourceStack.isEmpty() || requestedCount <= 0) {
             return 0;
         }
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(sourceStack);
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(sourceStack);
         if (!shouldHandleAsBurnable(sourceStack)) {
             return 0;
         }

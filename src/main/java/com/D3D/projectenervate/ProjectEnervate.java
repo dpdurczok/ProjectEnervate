@@ -8,6 +8,7 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
+import com.D3D.projectenervate.emc.KnownSourceEvents;
 
 @Mod(ProjectEnervate.MOD_ID)
 public final class ProjectEnervate {
@@ -25,5 +26,9 @@ public final class ProjectEnervate {
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onBlockPlaced);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onBlockDrops);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onPlayerLoggedOut);
+
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onBlockDrops);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onLivingDrops);
+        NeoForge.EVENT_BUS.addListener(KnownSourceEvents::onLevelTickPost);
     }
 }

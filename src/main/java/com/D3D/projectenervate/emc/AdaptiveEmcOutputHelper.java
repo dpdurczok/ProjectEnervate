@@ -19,6 +19,8 @@ public final class AdaptiveEmcOutputHelper {
             return;
         }
 
+        ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
+
         if (proposedAdaptiveStackEmc == null || proposedAdaptiveStackEmc.signum() <= 0) {
             AdaptiveEmcValues.remove(outputStack);
             return;

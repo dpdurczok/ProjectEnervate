@@ -15,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 
 public final class ProjectEnervateCommands {
 
@@ -55,13 +56,15 @@ public final class ProjectEnervateCommands {
 
         ctx.getSource().sendSuccess(
                 () -> Component.literal(
-                        "Set adaptive EMC for this held stack to "
+                        "Adaptive EMC Set to"
                                 + AdaptiveEmcValues.format(normalizedValue)
-                                + " EMC per item."
                 ),
                 true
         );
-
+        ProjectEnervateSourceHelper.markKnown(
+                stack,
+                ProjectEnervateSourceHelper.SOURCE_COMMAND
+        );
         return Command.SINGLE_SUCCESS;
     }
 

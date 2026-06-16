@@ -23,7 +23,13 @@
     "AbstractFurnaceBlockEntityMixin",
     "StonecutterMenuMixin",
     "ItemCombinerMenuMixin",
-    "BucketItemMixin"
+    "BucketItemMixin",
+    "ItemStackHandlerUnknownSourceMixin",
+    "InvWrapperUnknownSourceMixin",
+    "ItemEntityPickupUnknownSourceMixin",
+    "ResultSlotKnownSourceMixin",
+    "TransmutationMenuKnownSourceMixin",
+    "TransmutationQuickMoveKnownSourceMixin"
   ],
   "injectors": {
     "defaultRequire": 1

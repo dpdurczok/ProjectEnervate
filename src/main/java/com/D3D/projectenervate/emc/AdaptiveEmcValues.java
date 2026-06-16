@@ -100,11 +100,8 @@ public final class AdaptiveEmcValues {
         CustomData customData = copy.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = customData.copyTag();
 
-        if (!tag.contains(TAG_ADAPTIVE_EMC)) {
-            return copy;
-        }
-
         tag.remove(TAG_ADAPTIVE_EMC);
+        tag.remove(ProjectEnervateSourceHelper.TAG_SOURCE);
 
         if (tag.isEmpty()) {
             copy.remove(DataComponents.CUSTOM_DATA);
