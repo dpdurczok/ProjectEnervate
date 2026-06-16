@@ -13,7 +13,12 @@
     "AbstractContainerMenuMixin",
     "AbstractContainerScreenAccessor",
     "EMCMappingHandlerMixin",
-    "MouseTweaksMainMixin"
+    "MouseTweaksMainMixin",
+    "ResultSlotMixin",
+    "ResultSlotAccessor",
+    "CraftingResultSlotPreviewMixin",
+    "MerchantContainerMixin",
+    "MerchantResultSlotMixin"
   ],
   "injectors": {
     "defaultRequire": 1
