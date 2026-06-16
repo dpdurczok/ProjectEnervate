@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.D3D.projectenervate.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "TransmutationInventoryMixin",
+    "SlotConsumeMixin",
+    "TransmutationContainerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
