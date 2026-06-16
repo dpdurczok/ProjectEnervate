@@ -56,7 +56,7 @@ public final class ProjectEnervateCommands {
 
         ctx.getSource().sendSuccess(
                 () -> Component.literal(
-                        "Adaptive EMC Set to"
+                        "Adaptive EMC Set to "
                                 + AdaptiveEmcValues.format(normalizedValue)
                 ),
                 true

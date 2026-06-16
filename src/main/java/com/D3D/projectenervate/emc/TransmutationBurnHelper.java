@@ -37,8 +37,6 @@ public final class TransmutationBurnHelper {
             return 0;
         }
         ProjectEnervateSourceHelper.enforceUnknownMinimum(sourceStack);
-
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(sourceStack);
         if (!shouldHandleAsBurnable(sourceStack)) {
             return 0;
         }

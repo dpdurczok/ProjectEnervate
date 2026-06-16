@@ -1,8 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
-import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
-import java.math.BigInteger;
+import com.D3D.projectenervate.emc.TransmutationBurnHelper;
 import moze_intel.projecte.api.capabilities.PECapabilities;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
@@ -15,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -67,42 +67,7 @@ public abstract class TransmutationContainerMixin {
             return;
         }
 
-        ProjectEnervateTransmutationAccess access =
-                (ProjectEnervateTransmutationAccess) transmutationInventory;
-
-        BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
-
-        int itemsToBurn = AdaptiveEmcHelper.getMaxItemsThatFit(freeEmc, slotStack);
-
-        if (itemsToBurn <= 0) {
-            cir.setReturnValue(ItemStack.EMPTY);
-            return;
-        }
-
-        BigInteger emcToAdd = AdaptiveEmcHelper.getStackSellValue(slotStack, itemsToBurn);
-
-        if (emcToAdd.signum() <= 0) {
-            cir.setReturnValue(ItemStack.EMPTY);
-            return;
-        }
-
-        ItemStack burnedStack = slotStack.copy();
-        burnedStack.setCount(itemsToBurn);
-
-        if (transmutationInventory.isServer()) {
-            transmutationInventory.handleKnowledge(burnedStack);
-            transmutationInventory.addEmc(emcToAdd);
-        }
-
-        slotStack.shrink(itemsToBurn);
-
-        if (slotStack.isEmpty()) {
-            slot.set(ItemStack.EMPTY);
-        } else {
-            slot.setChanged();
-        }
-
-        cir.setReturnValue(burnedStack);
+        projectenervate$burnShiftClickedStack(slot, slotStack, cir);
     }
 
     @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
@@ -133,46 +98,32 @@ public abstract class TransmutationContainerMixin {
 
         ItemStack slotStack = slot.getItem();
 
-        if (slotStack.getCapability(PECapabilities.EMC_HOLDER_ITEM_CAPABILITY) != null) {
+        if (!TransmutationBurnHelper.shouldHandleAsBurnable(slotStack)) {
             return;
         }
 
-        if (slotStack.getItem() instanceof Tome) {
-            return;
-        }
+        projectenervate$burnShiftClickedStack(slot, slotStack, cir);
+    }
 
-        if (!com.D3D.projectenervate.emc.AdaptiveEmcHelper.hasPositiveSellValue(slotStack)) {
-            return;
-        }
-
-        ProjectEnervateTransmutationAccess access =
-                (ProjectEnervateTransmutationAccess) transmutationInventory;
-
-        BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
-
-        int itemsToBurn = com.D3D.projectenervate.emc.AdaptiveEmcHelper.getMaxItemsThatFit(freeEmc, slotStack);
-
-        if (itemsToBurn <= 0) {
-            cir.setReturnValue(ItemStack.EMPTY);
-            return;
-        }
-
-        BigInteger emcToAdd = com.D3D.projectenervate.emc.AdaptiveEmcHelper.getStackSellValue(slotStack, itemsToBurn);
-
-        if (emcToAdd.signum() <= 0) {
-            cir.setReturnValue(ItemStack.EMPTY);
-            return;
-        }
-
+    @Unique
+    private void projectenervate$burnShiftClickedStack(
+            Slot slot,
+            ItemStack slotStack,
+            CallbackInfoReturnable<ItemStack> cir
+    ) {
         ItemStack burnedStack = slotStack.copy();
-        burnedStack.setCount(itemsToBurn);
+        int burned = TransmutationBurnHelper.burnFromStack(
+                transmutationInventory,
+                slotStack,
+                slotStack.getCount()
+        );
 
-        if (transmutationInventory.isServer()) {
-            transmutationInventory.handleKnowledge(burnedStack);
-            transmutationInventory.addEmc(emcToAdd);
+        if (burned <= 0) {
+            cir.setReturnValue(ItemStack.EMPTY);
+            return;
         }
 
-        slotStack.shrink(itemsToBurn);
+        burnedStack.setCount(burned);
 
         if (slotStack.isEmpty()) {
             slot.set(ItemStack.EMPTY);

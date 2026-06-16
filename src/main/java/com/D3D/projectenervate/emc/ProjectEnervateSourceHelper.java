@@ -50,12 +50,20 @@ public final class ProjectEnervateSourceHelper {
         }
 
         CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> {
-            tag.putString(TAG_SOURCE, KNOWN_SOURCE_VALUE);
+            String sourceValue = source == null || source.isBlank()
+                    ? KNOWN_SOURCE_VALUE
+                    : source;
+
+            tag.putString(TAG_SOURCE, sourceValue);
         });
     }
 
     public static void markKnownIfBaseEmc(ItemStack stack, String source) {
         if (stack.isEmpty()) {
+            return;
+        }
+
+        if (hasKnownSource(stack)) {
             return;
         }
 
