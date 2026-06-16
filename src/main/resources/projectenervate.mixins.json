@@ -40,7 +40,15 @@
     "TransmutationMenuKnownSourceMixin",
     "TransmutationQuickMoveKnownSourceMixin",
     "KleinStarCapacityMixin",
-    "ItemStackProjectEnervateCompatibilityMixin"
+    "ItemStackProjectEnervateCompatibilityMixin",
+    "CreateRecipeApplierMixin",
+    "CreateBasinRecipeMixin",
+    "CreateMillstoneBlockEntityMixin",
+    "CreateCrushingWheelControllerBlockEntityMixin",
+    "CreateSawBlockEntityMixin",
+    "CreateBlockBreakingKineticBlockEntityMixin",
+    "CreateDrillBlockEntityMixin",
+    "BlockGetDropsCreateEmcMixin"
   ],
   "injectors": {
     "defaultRequire": 1

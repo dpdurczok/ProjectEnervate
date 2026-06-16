@@ -24,12 +24,24 @@ public final class ProjectEnervateMixinPlugin implements IMixinConfigPlugin {
             return isMouseTweaksLoaded();
         }
 
+        if (mixinClassName.contains("Create") || mixinClassName.endsWith("BlockGetDropsCreateEmcMixin")) {
+            return isCreateLoaded();
+        }
+
         return true;
     }
 
     private static boolean isMouseTweaksLoaded() {
         try {
             return LoadingModList.get().getModFileById("mousetweaks") != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isCreateLoaded() {
+        try {
+            return LoadingModList.get().getModFileById("create") != null;
         } catch (Throwable ignored) {
             return false;
         }

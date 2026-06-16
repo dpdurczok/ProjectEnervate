@@ -27,6 +27,53 @@ public final class ProjectEMachineEmcHelper {
         return snapshot;
     }
 
+
+    public static BigDecimal getConsumedInputBudget(
+            List<ItemStack> beforeInputs,
+            IItemHandler afterInputInventory
+    ) {
+        if (beforeInputs == null || beforeInputs.isEmpty() || afterInputInventory == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalBudget = BigDecimal.ZERO;
+        int slots = Math.min(beforeInputs.size(), afterInputInventory.getSlots());
+
+        for (int slot = 0; slot < slots; slot++) {
+            ItemStack beforeStack = beforeInputs.get(slot);
+
+            if (beforeStack.isEmpty()) {
+                continue;
+            }
+
+            ItemStack afterStack = afterInputInventory.getStackInSlot(slot);
+            int consumedCount = getConsumedCount(beforeStack, afterStack);
+
+            if (consumedCount <= 0) {
+                continue;
+            }
+
+            ItemStack consumedStack = beforeStack.copy();
+            consumedStack.setCount(consumedCount);
+            totalBudget = totalBudget.add(AdaptiveEmcOutputHelper.getEffectiveStackEmc(consumedStack));
+        }
+
+        return totalBudget;
+    }
+
+    public static void applyGeneratedOutputBudgetToList(
+            List<ItemStack> beforeOutputs,
+            List<ItemStack> outputStacks,
+            BigDecimal inputBudget
+    ) {
+        if (outputStacks == null || outputStacks.isEmpty()) {
+            return;
+        }
+
+        List<GeneratedOutput> generatedOutputs = findGeneratedOutputs(beforeOutputs, outputStacks);
+        applyGeneratedOutputs(generatedOutputs, inputBudget);
+    }
+
     public static BigDecimal getOneItemInputBudget(ItemStack input) {
         if (input.isEmpty()) {
             return BigDecimal.ZERO;
@@ -54,8 +101,11 @@ public final class ProjectEMachineEmcHelper {
             return;
         }
 
-        List<GeneratedOutput> generatedOutputs = findGeneratedOutputs(beforeOutputs, outputInventory);
+        applyGeneratedOutputs(findGeneratedOutputs(beforeOutputs, outputInventory), inputBudget);
+    }
 
+
+    private static void applyGeneratedOutputs(List<GeneratedOutput> generatedOutputs, BigDecimal inputBudget) {
         if (generatedOutputs.isEmpty()) {
             return;
         }
@@ -105,6 +155,49 @@ public final class ProjectEMachineEmcHelper {
         }
     }
 
+    private static List<GeneratedOutput> findGeneratedOutputs(List<ItemStack> beforeOutputs, List<ItemStack> outputStacks) {
+        List<GeneratedOutput> generatedOutputs = new ArrayList<>();
+
+        if (outputStacks == null) {
+            return generatedOutputs;
+        }
+
+        for (int slot = 0; slot < outputStacks.size(); slot++) {
+            ItemStack afterStack = outputStacks.get(slot);
+
+            if (afterStack == null || afterStack.isEmpty()) {
+                continue;
+            }
+
+            ItemStack beforeStack = beforeOutputs != null && slot < beforeOutputs.size()
+                    ? beforeOutputs.get(slot)
+                    : ItemStack.EMPTY;
+            int generatedCount = getGeneratedCount(beforeStack, afterStack);
+
+            if (generatedCount > 0) {
+                generatedOutputs.add(new GeneratedOutput(beforeStack, afterStack, generatedCount));
+            }
+        }
+
+        return generatedOutputs;
+    }
+
+    private static int getConsumedCount(ItemStack beforeStack, ItemStack afterStack) {
+        if (beforeStack.isEmpty()) {
+            return 0;
+        }
+
+        if (afterStack.isEmpty()) {
+            return beforeStack.getCount();
+        }
+
+        if (AdaptiveEmcHelper.canMergeIgnoringProjectEnervateMetadata(beforeStack, afterStack)) {
+            return Math.max(0, beforeStack.getCount() - afterStack.getCount());
+        }
+
+        return beforeStack.getCount();
+    }
+
     private static List<GeneratedOutput> findGeneratedOutputs(List<ItemStack> beforeOutputs, IItemHandler outputInventory) {
         List<GeneratedOutput> generatedOutputs = new ArrayList<>();
         int slots = outputInventory.getSlots();
@@ -116,7 +209,9 @@ public final class ProjectEMachineEmcHelper {
                 continue;
             }
 
-            ItemStack beforeStack = slot < beforeOutputs.size() ? beforeOutputs.get(slot) : ItemStack.EMPTY;
+            ItemStack beforeStack = beforeOutputs != null && slot < beforeOutputs.size()
+                    ? beforeOutputs.get(slot)
+                    : ItemStack.EMPTY;
             int generatedCount = getGeneratedCount(beforeStack, afterStack);
 
             if (generatedCount > 0) {

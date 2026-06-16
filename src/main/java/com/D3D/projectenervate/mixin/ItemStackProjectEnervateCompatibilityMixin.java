@@ -29,22 +29,16 @@ public abstract class ItemStackProjectEnervateCompatibilityMixin {
             return;
         }
 
-        // Do not let vanilla merge adaptive or VOID stacks through this global compatibility
-        // method. Vanilla merges keep the destination stack's components and can silently
-        // discard ProjectEnervate's per-stack EMC. Adaptive merges are handled explicitly
-        // by ProjectEnervate's menu/inventory hooks, where EMC is averaged instead.
-        if (ProjectEnervateSourceHelper.isAdaptive(first)
-                || ProjectEnervateSourceHelper.isAdaptive(second)
-                || ProjectEnervateSourceHelper.isZero(first)
-                || ProjectEnervateSourceHelper.isZero(second)) {
-            return;
-        }
-
         if (!ProjectEnervateSourceHelper.hasProjectEnervateData(first)
                 && !ProjectEnervateSourceHelper.hasProjectEnervateData(second)) {
             return;
         }
 
+        // This intentionally matches the backup_09 behavior: ProjectEnervate's own
+        // economic metadata must not make two otherwise identical items incompatible.
+        // Machine inventories can then merge zero, verified, adaptive, assigned, and
+        // mixed-state stacks generically. ItemStackHandler/InvWrapper return hooks
+        // recompute the merged stack's economic state with AdaptiveEmcHelper.
         if (AdaptiveEmcHelper.areSameItemSameComponentsIgnoringProjectEnervate(first, second)) {
             cir.setReturnValue(true);
         }

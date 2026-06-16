@@ -5,6 +5,7 @@ import net.neoforged.fml.ModList;
 public final class ProjectEnervateCompat {
 
     private static Boolean mouseTweaksLoaded;
+    private static Boolean createLoaded;
 
     private ProjectEnervateCompat() {
     }
@@ -15,5 +16,13 @@ public final class ProjectEnervateCompat {
         }
 
         return mouseTweaksLoaded;
+    }
+
+    public static boolean isCreateLoaded() {
+        if (createLoaded == null) {
+            createLoaded = ModList.get().isLoaded("create");
+        }
+
+        return createLoaded;
     }
 }
