@@ -42,7 +42,7 @@ public abstract class TransmutationMenuKnownSourceMixin {
         Slot slot = menu.slots.get(slotId);
 
         if (slot.hasItem()) {
-            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(slot.getItem());
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(slot.getItem());
         }
     }
 
@@ -64,7 +64,7 @@ public abstract class TransmutationMenuKnownSourceMixin {
             ItemStack carried = menu.getCarried();
 
             if (!carried.isEmpty()) {
-                ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(carried);
+                ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(carried);
             }
         }
 
@@ -83,7 +83,7 @@ public abstract class TransmutationMenuKnownSourceMixin {
                 continue;
             }
 
-            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(slot.getItem());
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(slot.getItem());
         }
     }
 

@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.emc;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import moze_intel.projecte.api.proxy.IEMCProxy;
@@ -15,6 +16,13 @@ public final class AdaptiveEmcOutputHelper {
             BigDecimal proposedAdaptiveStackEmc
     ) {
         if (outputStack.isEmpty()) {
+            return;
+        }
+
+        if (!ProjectEnervateConfig.adaptiveEmc()) {
+            if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(outputStack)) {
+                ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
+            }
             return;
         }
 

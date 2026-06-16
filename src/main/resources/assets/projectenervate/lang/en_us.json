@@ -1,0 +1,9 @@
+{
+  "block.projectenervate.emc_assignment_station": "EMC Assignment Station",
+  "item.projectenervate.emc_assignment_station": "EMC Assignment Station",
+  "container.projectenervate.emc_assignment_station": "EMC Assignment Station",
+  "projectenervate.configuration.void_unknown_sources": "Void Unknown Sources",
+  "projectenervate.configuration.adaptive_emc": "Adaptive EMC",
+  "projectenervate.configuration.disable_collectors": "Disable Collectors",
+  "projectenervate.configuration.cap_max_emc_to_klein_stars": "Cap Max EMC to Klein Stars"
+}

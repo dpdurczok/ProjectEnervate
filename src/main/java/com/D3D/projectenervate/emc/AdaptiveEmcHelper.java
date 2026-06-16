@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.emc;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -31,13 +32,17 @@ public final class AdaptiveEmcHelper {
             return BigDecimal.ZERO;
         }
 
+        if (!ProjectEnervateConfig.adaptiveEmc()) {
+            return AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
+        }
+
         Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
 
         if (adaptiveValue.isPresent()) {
             return adaptiveValue.get();
         }
 
-        if (ProjectEnervateSourceHelper.isVerified(stack)) {
+        if (ProjectEnervateSourceHelper.isVerified(stack) || !ProjectEnervateConfig.voidUnknownSources()) {
             return AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
         }
 
@@ -133,6 +138,10 @@ public final class AdaptiveEmcHelper {
     }
 
     public static boolean shouldUseProjectEnervateMerge(ItemStack existing, ItemStack incoming) {
+        if (!ProjectEnervateConfig.adaptiveEmc() && !ProjectEnervateConfig.voidUnknownSources()) {
+            return false;
+        }
+
         if (existing.isEmpty() || incoming.isEmpty()) {
             return false;
         }
@@ -307,6 +316,18 @@ public final class AdaptiveEmcHelper {
                 .multiply(BigDecimal.valueOf(movedCount));
 
         BigDecimal combinedTotal = existingTotal.add(incomingTotal);
+
+        if (AdaptiveEmcOutputHelper.getBaseSingleEmc(mergedStack).signum() <= 0
+                && combinedTotal.signum() > 0) {
+            BigDecimal perItem = combinedTotal.divide(
+                    BigDecimal.valueOf(mergedStack.getCount()),
+                    AdaptiveEmcValues.INTERNAL_SCALE,
+                    RoundingMode.HALF_UP
+            );
+            ProjectEnervateSourceHelper.markAssignedEmc(mergedStack, perItem);
+            return;
+        }
+
         AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(mergedStack, combinedTotal);
     }
 

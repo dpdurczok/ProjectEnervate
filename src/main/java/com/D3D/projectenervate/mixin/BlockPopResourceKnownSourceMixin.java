@@ -63,6 +63,6 @@ public abstract class BlockPopResourceKnownSourceMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack);
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(stack);
     }
 }

@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.emc;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -51,6 +52,15 @@ public final class AdaptiveEmcConversionHelper {
             List<ItemStack> outputs
     ) {
         if (outputs == null || outputs.isEmpty()) {
+            return;
+        }
+
+        if (!ProjectEnervateConfig.adaptiveEmc()) {
+            for (ItemStack output : outputs) {
+                if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(output)) {
+                    ProjectEnervateSourceHelper.clearProjectEnervateData(output);
+                }
+            }
             return;
         }
 

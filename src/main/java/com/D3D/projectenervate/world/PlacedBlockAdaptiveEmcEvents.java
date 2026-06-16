@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.world;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcValues;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import java.math.BigDecimal;
@@ -26,7 +27,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
 
 public final class PlacedBlockAdaptiveEmcEvents {
 
@@ -162,7 +162,6 @@ public final class PlacedBlockAdaptiveEmcEvents {
         projectenervate$applyBlockEmcToDrops(entry.emc(), event.getDrops());
     }
 
-
     public static boolean applyStoredBlockEmcToPoppedStack(Level level, BlockPos pos, ItemStack stack) {
         if (!(level instanceof ServerLevel serverLevel)) {
             return false;
@@ -220,8 +219,6 @@ public final class PlacedBlockAdaptiveEmcEvents {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         PENDING_PLACEMENTS.remove(event.getEntity().getUUID());
     }
-
-
 
     private static void projectenervate$clearNaturalDropBudget(ServerLevel level, BlockPos pos) {
         NATURAL_DROP_BUDGETS.remove(new NaturalDropBudgetKey(level.dimension(), pos.asLong()));
@@ -408,7 +405,6 @@ public final class PlacedBlockAdaptiveEmcEvents {
             );
         }
     }
-
 
     private record NaturalDropBudgetKey(
             ResourceKey<Level> dimension,

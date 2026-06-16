@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.D3D.projectenervate.mixin",
+  "plugin": "com.D3D.projectenervate.mixin.ProjectEnervateMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "TransmutationInventoryMixin",
+    "SlotConsumeMixin",
+    "TransmutationContainerMixin",
+    "InventoryMixin",
+    "SlotMixin",
+    "AbstractContainerMenuMixin",
+    "AbstractContainerScreenAccessor",
+    "EMCMappingHandlerMixin",
+    "MouseTweaksMainMixin",
+    "ResultSlotMixin",
+    "ResultSlotAccessor",
+    "CraftingResultSlotPreviewMixin",
+    "MerchantContainerMixin",
+    "MerchantResultSlotMixin",
+    "RecipeManagerMixin",
+    "AbstractFurnaceBlockEntityMixin",
+    "StonecutterMenuMixin",
+    "ItemCombinerMenuMixin",
+    "BucketItemMixin",
+    "ItemStackHandlerUnknownSourceMixin",
+    "InvWrapperUnknownSourceMixin",
+    "ItemEntityPickupUnknownSourceMixin",
+    "ResultSlotKnownSourceMixin",
+    "TransmutationMenuKnownSourceMixin",
+    "TransmutationQuickMoveKnownSourceMixin",
+    "KleinStarCapacityMixin",
+    "ItemStackProjectEnervateCompatibilityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

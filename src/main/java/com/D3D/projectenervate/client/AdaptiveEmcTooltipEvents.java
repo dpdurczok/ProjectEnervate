@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.client;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcValues;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
@@ -36,14 +37,12 @@ public final class AdaptiveEmcTooltipEvents {
             return;
         }
 
-        BigDecimal baseSingle = AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
-
-        if (baseSingle.signum() <= 0) {
+        if (ProjectEnervateSourceHelper.isZero(stack)) {
+            applyCorruptedTooltip(event.getToolTip());
             return;
         }
 
-        if (ProjectEnervateSourceHelper.isZero(stack)) {
-            applyCorruptedTooltip(event.getToolTip());
+        if (!ProjectEnervateConfig.adaptiveEmc()) {
             return;
         }
 
@@ -61,7 +60,11 @@ public final class AdaptiveEmcTooltipEvents {
             return;
         }
 
-        if (ProjectEnervateSourceHelper.isVerified(stack)) {
+        BigDecimal baseSingle = AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
+
+        if (baseSingle.signum() <= 0
+                || ProjectEnervateSourceHelper.isVerified(stack)
+                || !ProjectEnervateConfig.voidUnknownSources()) {
             return;
         }
 
@@ -118,7 +121,7 @@ public final class AdaptiveEmcTooltipEvents {
     private static void applyCorruptedTooltip(List<Component> tooltip) {
         replaceWithSingleEmcLine(
                 tooltip,
-                Component.literal("EMC: CORRUPTED").withStyle(ChatFormatting.RED)
+                Component.literal("EMC: VOID").withStyle(ChatFormatting.DARK_PURPLE)
         );
     }
 

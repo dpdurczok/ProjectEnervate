@@ -18,6 +18,6 @@ public abstract class ResultSlotKnownSourceMixin {
             ItemStack stack,
             CallbackInfo ci
     ) {
-        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack);
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(stack);
     }
 }

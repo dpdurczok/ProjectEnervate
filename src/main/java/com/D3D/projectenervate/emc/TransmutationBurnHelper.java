@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.emc;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -210,12 +211,13 @@ public final class TransmutationBurnHelper {
             return false;
         }
 
-        Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
+        if (ProjectEnervateSourceHelper.isZero(stack)) {
+            return true;
+        }
 
-        return adaptiveValue
-                .map(value -> value.signum() <= 0)
-                .orElseGet(() -> !ProjectEnervateSourceHelper.hasSourceMarker(stack)
-                        && ProjectEnervateSourceHelper.hasBaseEmc(stack));
+        return ProjectEnervateConfig.voidUnknownSources()
+                && !ProjectEnervateSourceHelper.hasSourceMarker(stack)
+                && ProjectEnervateSourceHelper.hasBaseEmc(stack);
     }
 
     private static BigDecimal getSingleBurnValueDecimal(ItemStack stack) {

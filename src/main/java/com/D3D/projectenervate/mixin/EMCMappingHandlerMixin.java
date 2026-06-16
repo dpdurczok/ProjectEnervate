@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import com.D3D.projectenervate.emc.VanillaEmcDefaults;
 import moze_intel.projecte.api.ItemInfo;
 import moze_intel.projecte.api.nss.NSSItem;
 import moze_intel.projecte.config.CustomEMCParser;
@@ -18,6 +19,8 @@ public abstract class EMCMappingHandlerMixin {
             Object2LongMap<ItemInfo> data,
             CallbackInfoReturnable<Integer> cir
     ) {
+        VanillaEmcDefaults.apply(data);
+
         if (CustomEMCParser.currentEntries == null) {
             return;
         }

@@ -5,7 +5,6 @@ import com.D3D.projectenervate.client.TransmutationSearchHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
-import java.math.BigInteger;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.gui.GUITransmutation;
 import net.minecraft.client.Minecraft;
@@ -314,12 +313,9 @@ public abstract class MouseTweaksMainMixin {
             return;
         }
 
-        BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
-
-        if (TransmutationBurnHelper.getMaxBurnableItems(freeEmc, sourceStack, 1) <= 0) {
-            return;
-        }
-
+        // Do not pre-filter by client-side storage math here. The server-side consume slot
+        // already validates capacity and burnability, and client pre-filtering can reject
+        // valid adaptive EMC stacks before the authoritative burn handler sees them.
         click(minecraft, menu, playerSlotId, 0, ClickType.PICKUP);
 
         if (menu.getCarried().isEmpty()) {
@@ -376,7 +372,7 @@ public abstract class MouseTweaksMainMixin {
     }
 
     private static void markStackKnown(ItemStack stack) {
-        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack);
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(stack);
     }
 
     private static void click(

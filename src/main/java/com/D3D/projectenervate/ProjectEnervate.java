@@ -1,11 +1,22 @@
 package com.D3D.projectenervate;
 
 import com.D3D.projectenervate.client.AdaptiveEmcTooltipEvents;
+import com.D3D.projectenervate.client.ProjectEnervateClientEvents;
 import com.D3D.projectenervate.command.ProjectEnervateCommands;
+import com.D3D.projectenervate.network.ProjectEnervateNetwork;
+import com.D3D.projectenervate.registry.ProjectEnervateBlockEntities;
+import com.D3D.projectenervate.registry.ProjectEnervateBlocks;
+import com.D3D.projectenervate.registry.ProjectEnervateItems;
+import com.D3D.projectenervate.registry.ProjectEnervateMenus;
 import com.D3D.projectenervate.world.PlacedBlockAdaptiveEmcEvents;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import com.D3D.projectenervate.emc.KnownSourceEvents;
@@ -16,8 +27,21 @@ public final class ProjectEnervate {
     public static final String MOD_ID = "projectenervate";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public ProjectEnervate() {
+    public ProjectEnervate(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("ProjectEnervate loaded.");
+
+        modContainer.registerConfig(ModConfig.Type.COMMON, ProjectEnervateConfig.SPEC);
+
+        ProjectEnervateBlocks.BLOCKS.register(modEventBus);
+        ProjectEnervateItems.ITEMS.register(modEventBus);
+        ProjectEnervateBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
+        ProjectEnervateMenus.MENU_TYPES.register(modEventBus);
+        modEventBus.addListener(ProjectEnervateNetwork::registerPayloads);
+
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            modEventBus.addListener(ProjectEnervateClientEvents::registerScreens);
+            ProjectEnervateClientEvents.registerConfigScreen(modContainer);
+        }
 
         NeoForge.EVENT_BUS.addListener(ProjectEnervateCommands::registerCommands);
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, AdaptiveEmcTooltipEvents::onItemTooltip);

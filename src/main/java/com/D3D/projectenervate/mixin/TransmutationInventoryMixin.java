@@ -1,15 +1,19 @@
 package com.D3D.projectenervate.mixin;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.math.BigInteger;
+import moze_intel.projecte.api.capabilities.IKnowledgeProvider;
 import moze_intel.projecte.api.capabilities.IKnowledgeProvider.TargetUpdateType;
 import moze_intel.projecte.api.capabilities.PECapabilities;
 import moze_intel.projecte.api.capabilities.block_entity.IEmcStorage.EmcAction;
 import moze_intel.projecte.api.capabilities.item.IItemEmcHolder;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
 import moze_intel.projecte.utils.MathUtils;
+import moze_intel.projecte.utils.PlayerHelper;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import org.spongepowered.asm.mixin.Final;
@@ -27,6 +31,13 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
     @Shadow
     @Final
     private IItemHandlerModifiable inputLocks;
+
+    @Shadow
+    @Final
+    public IKnowledgeProvider provider;
+
+    @Shadow
+    public net.minecraft.world.entity.player.Player player;
 
     @Shadow
     public abstract void syncChangedSlots(IntList slotsChanged, TargetUpdateType updateTargets);
@@ -47,11 +58,13 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
 
     /**
      * ProjectE normally returns player EMC plus Klein Star EMC.
-     * ProjectEnervate returns Klein Star EMC only.
+     * ProjectEnervate returns Klein Star EMC only while capMaxEmcToKleinStars is enabled.
      */
     @Overwrite
     public BigInteger getAvailableEmc() {
-        BigInteger emc = BigInteger.ZERO;
+        BigInteger emc = ProjectEnervateConfig.capMaxEmcToKleinStars()
+                ? BigInteger.ZERO
+                : provider.getEmc();
 
         for (int slotIndex = 0; slotIndex < inputLocks.getSlots(); slotIndex++) {
             if (slotIndex == PROJECTENERVATE_LOCK_INDEX) {
@@ -78,10 +91,16 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
     }
 
     /**
-     * Free EMC space inside the inserted left-side EMC-holder items.
+     * Free EMC space inside inserted EMC-holder items while capped mode is enabled.
+     * In normal ProjectE mode the player/global EMC pool is effectively unbounded, so this
+     * returns a very large value to avoid blocking ProjectEnervate burn checks.
      */
     @Override
     public BigInteger projectenervate$getFreeStarEmc() {
+        if (!ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+            return BigInteger.valueOf(Long.MAX_VALUE);
+        }
+
         BigInteger freeEmc = BigInteger.ZERO;
 
         for (int slotIndex = 0; slotIndex < inputLocks.getSlots(); slotIndex++) {
@@ -102,6 +121,10 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
 
     @Override
     public boolean projectenervate$canAcceptEmc(BigInteger value) {
+        if (!ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+            return true;
+        }
+
         if (value.signum() <= 0) {
             return true;
         }
@@ -131,13 +154,15 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
     }
 
     /**
-     * Add EMC into left-side EMC-holder items only.
-     * No leftover EMC is stored globally.
+     * Capped mode: add EMC into left-side EMC-holder items only.
+     * Normal mode: use ProjectE's provider/global EMC pool after filling EMC holders.
      */
     @Overwrite
     public void addEmc(BigInteger value) {
         if (value.signum() == 0) {
-            updateEmcAndSync(BigInteger.ZERO);
+            if (ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+                updateEmcAndSync(BigInteger.ZERO);
+            }
             return;
         }
 
@@ -173,20 +198,29 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
             }
         }
 
-        syncChangedSlots(changedSlots, TargetUpdateType.ALL);
+        if (ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+            syncChangedSlots(changedSlots, TargetUpdateType.ALL);
+            updateEmcAndSync(BigInteger.ZERO);
+            return;
+        }
 
-        // Force ProjectE's player/global EMC pool to stay empty.
-        updateEmcAndSync(BigInteger.ZERO);
+        syncChangedSlots(changedSlots, value.signum() == 0 ? TargetUpdateType.ALL : TargetUpdateType.NONE);
+
+        if (value.signum() > 0) {
+            projectenervate$updateProviderEmc(provider.getEmc().add(value));
+        }
     }
 
     /**
-     * Remove EMC from left-side EMC-holder items only.
-     * Player/global EMC is ignored.
+     * Capped mode: remove EMC from left-side EMC-holder items only.
+     * Normal mode: use ProjectE's provider/global EMC pool first, then EMC holders.
      */
     @Overwrite
     public void removeEmc(BigInteger value) {
         if (value.signum() == 0) {
-            updateEmcAndSync(BigInteger.ZERO);
+            if (ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+                updateEmcAndSync(BigInteger.ZERO);
+            }
             return;
         }
 
@@ -195,13 +229,35 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
             return;
         }
 
-        BigInteger available = getAvailableEmc();
+        if (ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+            BigInteger available = getAvailableEmc();
 
-        if (available.compareTo(value) < 0) {
+            if (available.compareTo(value) < 0) {
+                updateEmcAndSync(BigInteger.ZERO);
+                return;
+            }
+
+            IntList changedSlots = projectenervate$extractFromHolders(value);
+            syncChangedSlots(changedSlots, TargetUpdateType.ALL);
             updateEmcAndSync(BigInteger.ZERO);
             return;
         }
 
+        BigInteger currentEmc = provider.getEmc();
+
+        if (value.compareTo(currentEmc) <= 0) {
+            projectenervate$updateProviderEmc(currentEmc.subtract(value));
+            return;
+        }
+
+        BigInteger toRemoveFromHolders = value.subtract(currentEmc);
+        IntList changedSlots = projectenervate$extractFromHolders(toRemoveFromHolders);
+        syncChangedSlots(changedSlots, TargetUpdateType.NONE);
+        projectenervate$updateProviderEmc(BigInteger.ZERO);
+    }
+
+    @Unique
+    private IntList projectenervate$extractFromHolders(BigInteger value) {
         IntList changedSlots = new IntArrayList();
         BigInteger remaining = value;
 
@@ -230,9 +286,17 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
             }
         }
 
-        syncChangedSlots(changedSlots, TargetUpdateType.ALL);
+        return changedSlots;
+    }
 
-        // Force ProjectE's player/global EMC pool to stay empty.
-        updateEmcAndSync(BigInteger.ZERO);
+    @Unique
+    private void projectenervate$updateProviderEmc(BigInteger emc) {
+        if (emc.signum() < 0) {
+            emc = BigInteger.ZERO;
+        }
+
+        provider.setEmc(emc);
+        provider.syncEmc((ServerPlayer) player);
+        PlayerHelper.updateScore((ServerPlayer) player, PlayerHelper.SCOREBOARD_EMC, emc);
     }
 }

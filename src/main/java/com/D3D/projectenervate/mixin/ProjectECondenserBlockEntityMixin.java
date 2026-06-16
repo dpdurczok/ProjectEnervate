@@ -37,7 +37,7 @@ public abstract class ProjectECondenserBlockEntityMixin {
             ItemStack stack,
             boolean simulate
     ) {
-        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack);
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(stack);
         return ItemHandlerHelper.insertItemStacked(inventory, stack, simulate);
     }
 }

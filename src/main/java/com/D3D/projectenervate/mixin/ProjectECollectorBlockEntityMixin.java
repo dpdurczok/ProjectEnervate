@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.mixin;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import com.D3D.projectenervate.emc.ProjectEMachineEmcHelper;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import moze_intel.projecte.api.proxy.IEMCProxy;
@@ -16,6 +17,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = CollectorMK1BlockEntity.class, remap = false)
 public abstract class ProjectECollectorBlockEntityMixin {
+
+    @Inject(method = "updateEmc", at = @At("HEAD"), cancellable = true)
+    private void projectenervate$disableCollectorGeneration(Level level, BlockPos pos, CallbackInfo ci) {
+        if (ProjectEnervateConfig.disableCollectors()) {
+            ci.cancel();
+        }
+    }
 
     @Redirect(
             method = "updateEmc",
@@ -36,7 +44,7 @@ public abstract class ProjectECollectorBlockEntityMixin {
         ItemStack upgraded = aux.getStackInSlot(CollectorMK1BlockEntity.UPGRADE_SLOT);
 
         if (!upgraded.isEmpty()) {
-            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(upgraded);
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(upgraded);
         }
     }
 }

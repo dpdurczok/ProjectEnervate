@@ -1,5 +1,6 @@
 package com.D3D.projectenervate.emc;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import moze_intel.projecte.api.capabilities.PECapabilities;
 import moze_intel.projecte.gameObjs.registries.PEItems;
@@ -44,11 +45,11 @@ public final class ProjectEnervateSourceHelper {
     }
 
     public static void markKnown(ItemStack stack, String ignoredLegacySource) {
-        markVerifiedIfBaseEmc(stack);
+        markVerifiedIfBaseEmcPreservingExisting(stack);
     }
 
     public static void markKnownIfBaseEmc(ItemStack stack, String ignoredLegacySource) {
-        markVerifiedIfBaseEmc(stack);
+        markVerifiedIfBaseEmcPreservingExisting(stack);
     }
 
     public static boolean markVerifiedIfBaseEmc(ItemStack stack) {
@@ -63,6 +64,23 @@ public final class ProjectEnervateSourceHelper {
 
         markVerified(stack);
         return true;
+    }
+
+    /**
+     * Marks a normal base-EMC stack as verified, but never downgrades an existing
+     * zero/adaptive/assigned ProjectEnervate state. Use this for generic pickup,
+     * GUI, recipe, and output-display paths that only need to trust plain stacks.
+     */
+    public static boolean markVerifiedIfBaseEmcPreservingExisting(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        if (hasProjectEnervateData(stack)) {
+            return hasBaseEmc(stack) || AdaptiveEmcValues.has(stack);
+        }
+
+        return markVerifiedIfBaseEmc(stack);
     }
 
     public static void markVerified(ItemStack stack) {
@@ -100,6 +118,13 @@ public final class ProjectEnervateSourceHelper {
             return;
         }
 
+        if (!ProjectEnervateConfig.adaptiveEmc()) {
+            if (!markVerifiedIfBaseEmc(stack)) {
+                clearProjectEnervateData(stack);
+            }
+            return;
+        }
+
         if (perItemEmc == null || perItemEmc.signum() <= 0) {
             if (!markZeroIfBaseEmc(stack)) {
                 clearProjectEnervateData(stack);
@@ -122,7 +147,30 @@ public final class ProjectEnervateSourceHelper {
         writeState(stack, STATE_ADAPTIVE, AdaptiveEmcValues.normalizeInternal(perItemEmc));
     }
 
+    /**
+     * Assigns a positive per-item EMC value to a stack that has no ProjectE base EMC.
+     * This is intentionally separate from markAdaptive: adaptive conversion outputs
+     * are still capped against ProjectE base EMC, while the assignment station is a
+     * paid opt-in path for otherwise unvalued items.
+     */
+    public static void markAssignedEmc(ItemStack stack, BigDecimal perItemEmc) {
+        if (stack.isEmpty() || isProtectedProjectEItem(stack)) {
+            return;
+        }
+
+        if (perItemEmc == null || perItemEmc.signum() <= 0) {
+            clearProjectEnervateData(stack);
+            return;
+        }
+
+        writeState(stack, STATE_ADAPTIVE, AdaptiveEmcValues.normalizeInternal(perItemEmc));
+    }
+
     public static boolean enforceUnknownMinimum(ItemStack stack) {
+        if (!ProjectEnervateConfig.voidUnknownSources()) {
+            return false;
+        }
+
         if (stack.isEmpty() || hasProjectEnervateState(stack)) {
             return false;
         }
@@ -131,6 +179,10 @@ public final class ProjectEnervateSourceHelper {
     }
 
     public static boolean markUnknownSource(ItemStack stack) {
+        if (!ProjectEnervateConfig.voidUnknownSources()) {
+            return false;
+        }
+
         return markZeroIfBaseEmc(stack);
     }
 
@@ -208,7 +260,7 @@ public final class ProjectEnervateSourceHelper {
     }
 
     public static boolean isZero(ItemStack stack) {
-        return STATE_ZERO.equals(getState(stack));
+        return ProjectEnervateConfig.voidUnknownSources() && STATE_ZERO.equals(getState(stack));
     }
 
     public static boolean isAdaptive(ItemStack stack) {
@@ -273,7 +325,13 @@ public final class ProjectEnervateSourceHelper {
         }
 
         AdaptiveEmcValues.get(from).ifPresentOrElse(
-                value -> markAdaptive(to, value),
+                value -> {
+                    if (AdaptiveEmcOutputHelper.getBaseSingleEmc(to).signum() > 0) {
+                        markAdaptive(to, value);
+                    } else {
+                        markAssignedEmc(to, value);
+                    }
+                },
                 () -> {
                     if (isVerified(from)) {
                         if (!markVerifiedIfBaseEmc(to)) {

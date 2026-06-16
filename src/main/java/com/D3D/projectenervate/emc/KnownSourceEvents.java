@@ -15,13 +15,13 @@ public final class KnownSourceEvents {
                 continue;
             }
 
-            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(drop.getItem());
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(drop.getItem());
         }
     }
 
     public static void onLivingDrops(LivingDropsEvent event) {
         for (ItemEntity drop : event.getDrops()) {
-            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(drop.getItem());
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(drop.getItem());
         }
     }
 

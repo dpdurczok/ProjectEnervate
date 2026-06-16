@@ -39,6 +39,6 @@ public abstract class TransmutationQuickMoveKnownSourceMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(slot.getItem());
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmcPreservingExisting(slot.getItem());
     }
 }
