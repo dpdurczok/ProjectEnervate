@@ -1,9 +1,9 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
+import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import java.math.BigInteger;
 import moze_intel.projecte.api.capabilities.PECapabilities;
-import moze_intel.projecte.api.proxy.IEMCProxy;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
 import moze_intel.projecte.gameObjs.items.Tome;
@@ -26,16 +26,8 @@ public abstract class TransmutationContainerMixin {
     @Final
     public TransmutationInventory transmutationInventory;
 
-    /**
-     * Allows partial shift-click burning.
-     *
-     * Example:
-     * Stack has 64 diamonds.
-     * Klein Stars only have space for 10 diamonds worth of EMC.
-     * Result: 10 diamonds are burned, 54 diamonds remain in the inventory slot.
-     */
     @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
-    private void projectenervate$partialShiftClickBurn(
+    private void projectenervate$adaptiveShiftClickBurn(
             @NotNull Player player,
             int slotIndex,
             CallbackInfoReturnable<ItemStack> cir
@@ -58,19 +50,20 @@ public abstract class TransmutationContainerMixin {
 
         ItemStack slotStack = slot.getItem();
 
-        // Let ProjectE handle shift-clicking Klein Stars into the left input slots.
         if (slotStack.getCapability(PECapabilities.EMC_HOLDER_ITEM_CAPABILITY) != null) {
             return;
         }
 
-        // Keep ProjectE's Tome behavior unchanged.
         if (slotStack.getItem() instanceof Tome) {
             return;
         }
 
-        long singleItemEmc = IEMCProxy.INSTANCE.getSellValue(slotStack);
+        if (!AdaptiveEmcHelper.hasAdaptiveValue(slotStack)) {
+            return;
+        }
 
-        if (singleItemEmc <= 0) {
+        if (!AdaptiveEmcHelper.hasPositiveSellValue(slotStack)) {
+            cir.setReturnValue(ItemStack.EMPTY);
             return;
         }
 
@@ -78,26 +71,101 @@ public abstract class TransmutationContainerMixin {
                 (ProjectEnervateTransmutationAccess) transmutationInventory;
 
         BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
-        BigInteger singleItemEmcBig = BigInteger.valueOf(singleItemEmc);
 
-        int maxItemsThatFit = freeEmc.divide(singleItemEmcBig).intValue();
+        int itemsToBurn = AdaptiveEmcHelper.getMaxItemsThatFit(freeEmc, slotStack);
 
-        if (maxItemsThatFit <= 0) {
+        if (itemsToBurn <= 0) {
             cir.setReturnValue(ItemStack.EMPTY);
             return;
         }
 
-        int itemsToBurn = Math.min(slotStack.getCount(), maxItemsThatFit);
+        BigInteger emcToAdd = AdaptiveEmcHelper.getStackSellValue(slotStack, itemsToBurn);
 
-        // If the whole stack fits, let ProjectE's original code handle it.
-        if (itemsToBurn >= slotStack.getCount()) {
+        if (emcToAdd.signum() <= 0) {
+            cir.setReturnValue(ItemStack.EMPTY);
             return;
         }
 
         ItemStack burnedStack = slotStack.copy();
         burnedStack.setCount(itemsToBurn);
 
-        BigInteger emcToAdd = singleItemEmcBig.multiply(BigInteger.valueOf(itemsToBurn));
+        if (transmutationInventory.isServer()) {
+            transmutationInventory.handleKnowledge(burnedStack);
+            transmutationInventory.addEmc(emcToAdd);
+        }
+
+        slotStack.shrink(itemsToBurn);
+
+        if (slotStack.isEmpty()) {
+            slot.set(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+
+        cir.setReturnValue(burnedStack);
+    }
+
+    @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
+    private void projectenervate$mouseTweaksSafeShiftClickBurn(
+            @NotNull Player player,
+            int slotIndex,
+            CallbackInfoReturnable<ItemStack> cir
+    ) {
+        if (!com.D3D.projectenervate.compat.ProjectEnervateCompat.isMouseTweaksLoaded()) {
+            return;
+        }
+
+        AbstractContainerMenu menu = (AbstractContainerMenu) (Object) this;
+
+        if (slotIndex <= 26) {
+            return;
+        }
+
+        if (slotIndex < 0 || slotIndex >= menu.slots.size()) {
+            return;
+        }
+
+        Slot slot = menu.slots.get(slotIndex);
+
+        if (!slot.hasItem()) {
+            return;
+        }
+
+        ItemStack slotStack = slot.getItem();
+
+        if (slotStack.getCapability(PECapabilities.EMC_HOLDER_ITEM_CAPABILITY) != null) {
+            return;
+        }
+
+        if (slotStack.getItem() instanceof Tome) {
+            return;
+        }
+
+        if (!com.D3D.projectenervate.emc.AdaptiveEmcHelper.hasPositiveSellValue(slotStack)) {
+            return;
+        }
+
+        ProjectEnervateTransmutationAccess access =
+                (ProjectEnervateTransmutationAccess) transmutationInventory;
+
+        BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
+
+        int itemsToBurn = com.D3D.projectenervate.emc.AdaptiveEmcHelper.getMaxItemsThatFit(freeEmc, slotStack);
+
+        if (itemsToBurn <= 0) {
+            cir.setReturnValue(ItemStack.EMPTY);
+            return;
+        }
+
+        BigInteger emcToAdd = com.D3D.projectenervate.emc.AdaptiveEmcHelper.getStackSellValue(slotStack, itemsToBurn);
+
+        if (emcToAdd.signum() <= 0) {
+            cir.setReturnValue(ItemStack.EMPTY);
+            return;
+        }
+
+        ItemStack burnedStack = slotStack.copy();
+        burnedStack.setCount(itemsToBurn);
 
         if (transmutationInventory.isServer()) {
             transmutationInventory.handleKnowledge(burnedStack);

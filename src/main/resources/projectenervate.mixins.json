@@ -2,11 +2,18 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.D3D.projectenervate.mixin",
+  "plugin": "com.D3D.projectenervate.mixin.ProjectEnervateMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "TransmutationInventoryMixin",
     "SlotConsumeMixin",
-    "TransmutationContainerMixin"
+    "TransmutationContainerMixin",
+    "InventoryMixin",
+    "SlotMixin",
+    "AbstractContainerMenuMixin",
+    "AbstractContainerScreenAccessor",
+    "EMCMappingHandlerMixin",
+    "MouseTweaksMainMixin"
   ],
   "injectors": {
     "defaultRequire": 1
