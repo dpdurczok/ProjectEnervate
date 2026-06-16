@@ -6,12 +6,20 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "TransmutationInventoryMixin",
+    "ProjectECondenserBlockEntityMixin",
+    "ProjectECondenserMK2BlockEntityMixin",
+    "ProjectEMatterFurnaceBlockEntityMixin",
+    "ProjectECollectorBlockEntityMixin",
+    "ProjectERelayBlockEntityMixin",
     "SlotConsumeMixin",
     "TransmutationContainerMixin",
     "InventoryMixin",
+    "CreativeModeSlotKnownSourceMixin",
     "SlotMixin",
     "AbstractContainerMenuMixin",
     "AbstractContainerScreenAccessor",
+    "GUITransmutationAccessor",
+    "GUITransmutationSearchInputMixin",
     "EMCMappingHandlerMixin",
     "MouseTweaksMainMixin",
     "ResultSlotMixin",
@@ -24,13 +32,15 @@
     "StonecutterMenuMixin",
     "ItemCombinerMenuMixin",
     "BucketItemMixin",
+    "BlockPopResourceKnownSourceMixin",
     "ItemStackHandlerUnknownSourceMixin",
     "InvWrapperUnknownSourceMixin",
     "ItemEntityPickupUnknownSourceMixin",
     "ResultSlotKnownSourceMixin",
     "TransmutationMenuKnownSourceMixin",
     "TransmutationQuickMoveKnownSourceMixin",
-    "KleinStarCapacityMixin"
+    "KleinStarCapacityMixin",
+    "ItemStackProjectEnervateCompatibilityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

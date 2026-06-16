@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.entity.player.Player;
@@ -130,6 +131,8 @@ public abstract class AbstractContainerMenuMixin {
             return;
         }
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(carried);
+
         int maxMove = button == 0 ? carried.getCount() : 1;
 
         int moved = AdaptiveEmcHelper.mergeIntoSlot(slot, carried, maxMove);
@@ -163,6 +166,8 @@ public abstract class AbstractContainerMenuMixin {
             return;
         }
 
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
+
         projectenervate$adaptiveMenuMerged = AdaptiveEmcHelper.mergeIntoMenuSlots(
                 slots,
                 incoming,
@@ -192,4 +197,37 @@ public abstract class AbstractContainerMenuMixin {
             cir.setReturnValue(true);
         }
     }
+
+    @Inject(
+            method = "clicked(IILnet/minecraft/world/inventory/ClickType;Lnet/minecraft/world/entity/player/Player;)V",
+            at = @At("RETURN")
+    )
+    private void projectenervate$zeroUntrackedCarriedAndClickedStacksAfterClick(
+            int slotIndex,
+            int button,
+            ClickType clickType,
+            Player player,
+            CallbackInfo ci
+    ) {
+        boolean changed = false;
+        ItemStack carried = getCarried();
+
+        if (!carried.isEmpty() && ProjectEnervateSourceHelper.enforceUnknownMinimum(carried)) {
+            changed = true;
+        }
+
+        if (slotIndex >= 0 && slotIndex < slots.size()) {
+            Slot slot = slots.get(slotIndex);
+
+            if (slot.hasItem() && ProjectEnervateSourceHelper.enforceUnknownMinimum(slot.getItem())) {
+                slot.setChanged();
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            broadcastChanges();
+        }
+    }
+
 }

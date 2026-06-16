@@ -2,7 +2,6 @@ package com.D3D.projectenervate.emc;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Optional;
 import moze_intel.projecte.api.proxy.IEMCProxy;
 import net.minecraft.world.item.ItemStack;
 
@@ -20,27 +19,30 @@ public final class AdaptiveEmcOutputHelper {
         }
 
         if (proposedAdaptiveStackEmc == null || proposedAdaptiveStackEmc.signum() <= 0) {
-            ProjectEnervateSourceHelper.markUnknownSource(outputStack);
+            if (!ProjectEnervateSourceHelper.markZeroIfBaseEmc(outputStack)) {
+                ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
+            }
             return;
         }
 
         int outputCount = outputStack.getCount();
 
         if (outputCount <= 0) {
-            AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
             return;
         }
 
         BigDecimal baseStackEmc = getBaseStackEmc(outputStack);
 
         if (baseStackEmc.signum() <= 0) {
-            AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
             return;
         }
 
         if (proposedAdaptiveStackEmc.compareTo(baseStackEmc) >= 0) {
-            AdaptiveEmcValues.remove(outputStack);
-            ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
+            if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(outputStack)) {
+                ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
+            }
             return;
         }
 
@@ -51,12 +53,13 @@ public final class AdaptiveEmcOutputHelper {
         );
 
         if (adaptivePerItem.signum() <= 0) {
-            ProjectEnervateSourceHelper.markUnknownSource(outputStack);
+            if (!ProjectEnervateSourceHelper.markZeroIfBaseEmc(outputStack)) {
+                ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
+            }
             return;
         }
 
-        AdaptiveEmcValues.setExact(outputStack, adaptivePerItem);
-        ProjectEnervateSourceHelper.markKnown(outputStack, ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION);
+        ProjectEnervateSourceHelper.markAdaptive(outputStack, adaptivePerItem);
     }
 
     public static BigDecimal getBaseStackEmc(ItemStack stack) {
@@ -123,13 +126,7 @@ public final class AdaptiveEmcOutputHelper {
             return;
         }
 
-        Optional<BigDecimal> value = AdaptiveEmcValues.get(from);
-
-        if (value.isPresent()) {
-            AdaptiveEmcValues.setExact(to, value.get());
-        } else {
-            AdaptiveEmcValues.remove(to);
-        }
+        ProjectEnervateSourceHelper.copyEconomicState(from, to);
     }
 
     public static void mergeGeneratedIntoResultStack(

@@ -1,6 +1,8 @@
 package com.D3D.projectenervate.command;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcValues;
+import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -12,10 +14,10 @@ import moze_intel.projecte.PEPermissions;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 
 public final class ProjectEnervateCommands {
 
@@ -32,6 +34,7 @@ public final class ProjectEnervateCommands {
         event.getDispatcher().register(
                 Commands.literal("projecte")
                         .then(registerSetAdaptiveEmc())
+                        .then(registerValidate())
         );
     }
 
@@ -42,6 +45,12 @@ public final class ProjectEnervateCommands {
                         .executes(ProjectEnervateCommands::setAdaptiveEmc));
     }
 
+    private static LiteralArgumentBuilder<CommandSourceStack> registerValidate() {
+        return Commands.literal("validate")
+                .requires(PEPermissions.COMMAND_SET_EMC)
+                .executes(ProjectEnervateCommands::validateHeldItem);
+    }
+
     private static int setAdaptiveEmc(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         String rawValue = StringArgumentType.getString(ctx, "value");
         BigDecimal parsedValue = parseValue(rawValue);
@@ -49,23 +58,82 @@ public final class ProjectEnervateCommands {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         ItemStack stack = getHeldItem(player);
 
-        BigDecimal normalizedValue = AdaptiveEmcValues.normalize(parsedValue);
-        AdaptiveEmcValues.set(stack, normalizedValue);
+        BigDecimal normalizedValue = AdaptiveEmcValues.normalizeInternal(parsedValue);
 
-        player.inventoryMenu.broadcastChanges();
+        if (normalizedValue.signum() <= 0) {
+            if (!ProjectEnervateSourceHelper.markZeroIfBaseEmc(stack)) {
+                ProjectEnervateSourceHelper.clearProjectEnervateData(stack);
+            }
+        } else {
+            BigDecimal baseSingle = AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
+
+            if (baseSingle.signum() > 0 && normalizedValue.compareTo(baseSingle) >= 0) {
+                if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack)) {
+                    ProjectEnervateSourceHelper.clearProjectEnervateData(stack);
+                }
+            } else {
+                ProjectEnervateSourceHelper.markAdaptive(stack, normalizedValue);
+            }
+        }
+
+        syncHeldItem(player, stack);
 
         ctx.getSource().sendSuccess(
                 () -> Component.literal(
-                        "Adaptive EMC Set to "
-                                + AdaptiveEmcValues.format(normalizedValue)
+                        "ProjectEnervate EMC state set to "
+                                + ProjectEnervateCommands.describeState(stack, normalizedValue)
                 ),
                 true
         );
-        ProjectEnervateSourceHelper.markKnown(
-                stack,
-                ProjectEnervateSourceHelper.SOURCE_COMMAND
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int validateHeldItem(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        ItemStack stack = getHeldItem(player);
+
+        if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack)) {
+            ProjectEnervateSourceHelper.clearProjectEnervateData(stack);
+        }
+
+        syncHeldItem(player, stack);
+
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("ProjectEnervate EMC state set to verified"),
+                true
         );
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static void syncHeldItem(ServerPlayer player, ItemStack stack) {
+        player.getInventory().setChanged();
+        player.setItemInHand(player.getMainHandItem() == stack
+                ? net.minecraft.world.InteractionHand.MAIN_HAND
+                : net.minecraft.world.InteractionHand.OFF_HAND, stack);
+
+        player.inventoryMenu.broadcastChanges();
+        player.containerMenu.broadcastChanges();
+        player.inventoryMenu.broadcastFullState();
+        player.containerMenu.broadcastFullState();
+
+        int inventorySlot = player.getMainHandItem() == stack ? player.getInventory().selected : 40;
+        player.connection.send(new ClientboundContainerSetSlotPacket(-2, 0, inventorySlot, stack.copy()));
+    }
+
+    private static String describeState(ItemStack stack, BigDecimal requestedValue) {
+        if (ProjectEnervateSourceHelper.isVerified(stack)) {
+            return "verified";
+        }
+
+        if (ProjectEnervateSourceHelper.isZero(stack)) {
+            return "zero";
+        }
+
+        if (ProjectEnervateSourceHelper.isAdaptive(stack)) {
+            return "adaptive (" + AdaptiveEmcValues.format(requestedValue) + ")";
+        }
+
+        return "cleared";
     }
 
     private static BigDecimal parseValue(String rawValue) throws CommandSyntaxException {

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.Optional;
-import moze_intel.projecte.api.proxy.IEMCProxy;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -24,17 +23,25 @@ public final class AdaptiveEmcHelper {
             return BigDecimal.ZERO;
         }
 
+        if (ProjectEnervateSourceHelper.isProtectedProjectEItem(stack)) {
+            return AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
+        }
+
+        if (ProjectEnervateSourceHelper.isZero(stack)) {
+            return BigDecimal.ZERO;
+        }
+
         Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
 
         if (adaptiveValue.isPresent()) {
             return adaptiveValue.get();
         }
 
-        if (!ProjectEnervateSourceHelper.hasSourceMarker(stack)) {
-            return BigDecimal.ZERO;
+        if (ProjectEnervateSourceHelper.isVerified(stack)) {
+            return AdaptiveEmcOutputHelper.getBaseSingleEmc(stack);
         }
 
-        return BigDecimal.valueOf(IEMCProxy.INSTANCE.getSellValue(stack));
+        return BigDecimal.ZERO;
     }
 
     public static boolean hasPositiveSellValue(ItemStack stack) {
@@ -54,17 +61,11 @@ public final class AdaptiveEmcHelper {
             return BigInteger.ZERO;
         }
 
-        BigDecimal singleValue = getSingleSellValueDecimal(stack);
-
-        return getStackSellValue(singleValue, count);
+        return getStackSellValue(getSingleSellValueDecimal(stack), count);
     }
 
     public static BigInteger getStackSellValue(BigDecimal singleValue, int count) {
-        if (count <= 0) {
-            return BigInteger.ZERO;
-        }
-
-        if (singleValue.compareTo(BigDecimal.ZERO) <= 0) {
+        if (count <= 0 || singleValue.compareTo(BigDecimal.ZERO) <= 0) {
             return BigInteger.ZERO;
         }
 
@@ -87,22 +88,15 @@ public final class AdaptiveEmcHelper {
             return 0;
         }
 
-        BigDecimal singleValue = getSingleSellValueDecimal(stack);
-
-        return getMaxItemsThatFit(freeEmc, singleValue, stack.getCount());
+        return getMaxItemsThatFit(freeEmc, getSingleSellValueDecimal(stack), stack.getCount());
     }
 
     public static int getMaxItemsThatFit(BigInteger freeEmc, BigDecimal singleValue, int maxCount) {
-        if (freeEmc.signum() <= 0 || maxCount <= 0) {
+        if (freeEmc.signum() <= 0 || maxCount <= 0 || singleValue.compareTo(BigDecimal.ZERO) <= 0) {
             return 0;
         }
 
-        if (singleValue.compareTo(BigDecimal.ZERO) <= 0) {
-            return 0;
-        }
-
-        BigDecimal max = new BigDecimal(freeEmc)
-                .divide(singleValue, 0, RoundingMode.DOWN);
+        BigDecimal max = new BigDecimal(freeEmc).divide(singleValue, 0, RoundingMode.DOWN);
 
         if (max.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
             return maxCount;
@@ -112,30 +106,43 @@ public final class AdaptiveEmcHelper {
     }
 
     public static boolean canMergeIgnoringAdaptiveEmc(ItemStack existing, ItemStack incoming) {
-        if (existing.isEmpty() || incoming.isEmpty()) {
+        return canMergeIgnoringProjectEnervateMetadata(existing, incoming);
+    }
+
+    public static boolean canMergeIgnoringProjectEnervateMetadata(ItemStack existing, ItemStack incoming) {
+        return areSameItemSameComponentsIgnoringProjectEnervate(existing, incoming);
+    }
+
+    public static boolean areSameItemSameComponentsIgnoringProjectEnervate(ItemStack first, ItemStack second) {
+        if (first.isEmpty() || second.isEmpty()) {
             return false;
         }
 
-        if (!existing.is(incoming.getItem())) {
+        if (!first.is(second.getItem())) {
             return false;
         }
 
-        ItemStack cleanExisting = AdaptiveEmcValues.copyWithoutAdaptiveEmc(existing);
-        ItemStack cleanIncoming = AdaptiveEmcValues.copyWithoutAdaptiveEmc(incoming);
+        ItemStack cleanFirst = ProjectEnervateSourceHelper.copyWithoutProjectEnervateData(first);
+        ItemStack cleanSecond = ProjectEnervateSourceHelper.copyWithoutProjectEnervateData(second);
 
-        return ItemStack.isSameItemSameComponents(cleanExisting, cleanIncoming);
+        return cleanFirst.getComponents().equals(cleanSecond.getComponents());
     }
 
     public static boolean shouldUseAdaptiveMerge(ItemStack existing, ItemStack incoming) {
+        return shouldUseProjectEnervateMerge(existing, incoming);
+    }
+
+    public static boolean shouldUseProjectEnervateMerge(ItemStack existing, ItemStack incoming) {
         if (existing.isEmpty() || incoming.isEmpty()) {
             return false;
         }
 
-        if (!hasMergeRelevantEmc(existing) && !hasMergeRelevantEmc(incoming)) {
+        if (!canMergeIgnoringProjectEnervateMetadata(existing, incoming)) {
             return false;
         }
 
-        return canMergeIgnoringAdaptiveEmc(existing, incoming);
+        return ProjectEnervateSourceHelper.hasProjectEnervateData(existing)
+                || ProjectEnervateSourceHelper.hasProjectEnervateData(incoming);
     }
 
     public static int mergeIntoExistingStack(ItemStack existing, ItemStack incoming) {
@@ -143,7 +150,7 @@ public final class AdaptiveEmcHelper {
     }
 
     public static int mergeIntoExistingStack(ItemStack existing, ItemStack incoming, int maxMove, int maxStackSize) {
-        if (!shouldUseAdaptiveMerge(existing, incoming)) {
+        if (!shouldUseProjectEnervateMerge(existing, incoming)) {
             return 0;
         }
 
@@ -159,10 +166,14 @@ public final class AdaptiveEmcHelper {
             return 0;
         }
 
-        redistributeAdaptiveEmc(existing, incoming, movedCount);
+        ItemStack beforeExisting = existing.copy();
+        ItemStack incomingTemplate = incoming.copy();
+        incomingTemplate.setCount(movedCount);
 
         existing.grow(movedCount);
         incoming.shrink(movedCount);
+
+        applyMergedEconomicState(beforeExisting, incomingTemplate, existing, movedCount);
 
         return movedCount;
     }
@@ -172,11 +183,7 @@ public final class AdaptiveEmcHelper {
     }
 
     public static int mergeIntoSlot(Slot slot, ItemStack incoming, int maxMove) {
-        if (slot == null || incoming.isEmpty()) {
-            return 0;
-        }
-
-        if (!slot.hasItem()) {
+        if (slot == null || incoming.isEmpty() || !slot.hasItem()) {
             return 0;
         }
 
@@ -185,9 +192,7 @@ public final class AdaptiveEmcHelper {
         }
 
         ItemStack existing = slot.getItem();
-
         int slotLimit = Math.min(slot.getMaxStackSize(incoming), existing.getMaxStackSize());
-
         int moved = mergeIntoExistingStack(existing, incoming, maxMove, slotLimit);
 
         if (moved > 0) {
@@ -267,35 +272,42 @@ public final class AdaptiveEmcHelper {
         return changed;
     }
 
-    private static void redistributeAdaptiveEmc(ItemStack existing, ItemStack incoming, int movedCount) {
-        BigDecimal existingEach = getSingleMergeValueDecimal(existing);
-        BigDecimal incomingEach = getSingleMergeValueDecimal(incoming);
-
-        BigDecimal existingTotal = existingEach.multiply(BigDecimal.valueOf(existing.getCount()));
-        BigDecimal incomingMovedTotal = incomingEach.multiply(BigDecimal.valueOf(movedCount));
-
-        int newCount = existing.getCount() + movedCount;
-
-        BigDecimal newEach = existingTotal
-                .add(incomingMovedTotal)
-                .divide(
-                        BigDecimal.valueOf(newCount),
-                        AdaptiveEmcValues.INTERNAL_SCALE,
-                        RoundingMode.HALF_UP
-                );
-
-        BigDecimal baseEach = AdaptiveEmcOutputHelper.getBaseSingleEmc(existing);
-
-        if (baseEach.signum() > 0 && newEach.compareTo(baseEach) >= 0) {
-            AdaptiveEmcValues.remove(existing);
-            ProjectEnervateSourceHelper.markKnown(
-                    existing,
-                    ProjectEnervateSourceHelper.SOURCE_TRACKED_CONVERSION
-            );
+    /**
+     * Recomputes the economic state of a stack after vanilla or a modded inventory
+     * has already merged inserted items into it because ProjectEnervate metadata was
+     * ignored for stack compatibility.
+     */
+    public static void applyMergedEconomicState(
+            ItemStack beforeExisting,
+            ItemStack incomingTemplate,
+            ItemStack mergedStack,
+            int movedCount
+    ) {
+        if (mergedStack.isEmpty() || incomingTemplate.isEmpty() || movedCount <= 0) {
             return;
         }
 
-        AdaptiveEmcValues.setExact(existing, newEach);
+        if (!beforeExisting.isEmpty()
+                && !canMergeIgnoringProjectEnervateMetadata(beforeExisting, incomingTemplate)) {
+            return;
+        }
+
+        if (!canMergeIgnoringProjectEnervateMetadata(mergedStack, incomingTemplate)) {
+            return;
+        }
+
+        BigDecimal existingTotal = BigDecimal.ZERO;
+
+        if (!beforeExisting.isEmpty()) {
+            existingTotal = getSingleMergeValueDecimal(beforeExisting)
+                    .multiply(BigDecimal.valueOf(beforeExisting.getCount()));
+        }
+
+        BigDecimal incomingTotal = getSingleMergeValueDecimal(incomingTemplate)
+                .multiply(BigDecimal.valueOf(movedCount));
+
+        BigDecimal combinedTotal = existingTotal.add(incomingTotal);
+        AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(mergedStack, combinedTotal);
     }
 
     public static BigDecimal getSingleMergeValueDecimal(ItemStack stack) {
@@ -303,11 +315,6 @@ public final class AdaptiveEmcHelper {
             return BigDecimal.ZERO;
         }
 
-        return AdaptiveEmcValues.get(stack)
-                .orElseGet(() -> AdaptiveEmcOutputHelper.getBaseSingleEmc(stack));
-    }
-
-    private static boolean hasMergeRelevantEmc(ItemStack stack) {
-        return AdaptiveEmcValues.has(stack) || ProjectEnervateSourceHelper.hasSourceMarker(stack);
+        return getSingleSellValueDecimal(stack);
     }
 }

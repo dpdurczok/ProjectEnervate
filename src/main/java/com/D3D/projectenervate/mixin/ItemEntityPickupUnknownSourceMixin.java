@@ -30,6 +30,9 @@ public abstract class ItemEntityPickupUnknownSourceMixin {
             return;
         }
 
+        // Pickup is not a creative-source proof. Creative players can pick up
+        // machine-generated item entities too, so unmarked base-EMC item entities
+        // must still become zero unless they were already verified at their real source.
         ProjectEnervateSourceHelper.enforceUnknownMinimum(stack);
     }
 }

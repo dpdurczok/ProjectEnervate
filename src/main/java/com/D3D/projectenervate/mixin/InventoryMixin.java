@@ -3,6 +3,7 @@ package com.D3D.projectenervate.mixin;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.core.NonNullList;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
@@ -21,6 +22,10 @@ public abstract class InventoryMixin {
     @Final
     public NonNullList<ItemStack> items;
 
+    @Shadow
+    @Final
+    public Player player;
+
     @Unique
     private boolean projectenervate$adaptiveInventoryMerged;
 
@@ -35,7 +40,7 @@ public abstract class InventoryMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
+        projectenervate$prepareIncomingStack(incoming);
         projectenervate$adaptiveInventoryMerged = AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {
@@ -65,7 +70,7 @@ public abstract class InventoryMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
+        projectenervate$prepareIncomingStack(incoming);
         projectenervate$adaptiveInventoryMerged = AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {
@@ -98,11 +103,19 @@ public abstract class InventoryMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
+        projectenervate$prepareIncomingStack(incoming);
         AdaptiveEmcHelper.mergeIntoInventoryList(items, incoming);
 
         if (incoming.isEmpty()) {
             ci.cancel();
         }
+    }
+
+    @Unique
+    private void projectenervate$prepareIncomingStack(ItemStack incoming) {
+        // Do not trust every stack merely because the receiving player is in creative.
+        // Machine outputs picked up during creative testing also pass through Inventory.add.
+        // Actual creative/JEI granted stacks need a dedicated creative-source hook.
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
     }
 }

@@ -71,14 +71,16 @@ public final class AdaptiveEmcConversionHelper {
 
         if (totalOutputBaseEmc.signum() <= 0) {
             for (ItemStack output : outputs) {
-                AdaptiveEmcValues.remove(output);
+                ProjectEnervateSourceHelper.clearProjectEnervateData(output);
             }
             return;
         }
 
         if (inputBudget.compareTo(totalOutputBaseEmc) >= 0) {
             for (ItemStack output : outputs) {
-                AdaptiveEmcValues.remove(output);
+                if (!ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(output)) {
+                    ProjectEnervateSourceHelper.clearProjectEnervateData(output);
+                }
             }
             return;
         }
@@ -91,7 +93,7 @@ public final class AdaptiveEmcConversionHelper {
             BigDecimal outputBaseEmc = AdaptiveEmcOutputHelper.getBaseStackEmc(output);
 
             if (outputBaseEmc.signum() <= 0) {
-                AdaptiveEmcValues.remove(output);
+                ProjectEnervateSourceHelper.clearProjectEnervateData(output);
                 continue;
             }
 

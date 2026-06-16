@@ -21,7 +21,7 @@ public final class TradeAdaptiveEmcHelper {
         MerchantOffer offer = container.getActiveOffer();
 
         if (offer == null) {
-            AdaptiveEmcValues.remove(outputStack);
+            ProjectEnervateSourceHelper.clearProjectEnervateData(outputStack);
             return;
         }
 
@@ -40,13 +40,6 @@ public final class TradeAdaptiveEmcHelper {
         BigDecimal paidEmc = projectenervate$getPaidEmc(container, offer);
 
         AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(outputStack, paidEmc);
-
-        if (paidEmc.signum() > 0) {
-            ProjectEnervateSourceHelper.markKnown(
-                    outputStack,
-                    ProjectEnervateSourceHelper.SOURCE_TRADE
-            );
-        }
     }
 
     private static BigDecimal projectenervate$getPaidEmc(

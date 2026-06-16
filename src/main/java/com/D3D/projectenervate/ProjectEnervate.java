@@ -24,7 +24,7 @@ public final class ProjectEnervate {
 
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onBlockPlaced);
-        NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onBlockDrops);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOW, PlacedBlockAdaptiveEmcEvents::onBlockDrops);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onPlayerLoggedOut);
 
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onBlockDrops);

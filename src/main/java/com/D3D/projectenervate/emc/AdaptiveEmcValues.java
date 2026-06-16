@@ -32,7 +32,7 @@ public final class AdaptiveEmcValues {
         }
 
         BigDecimal normalized = normalize(value);
-        write(stack, normalized);
+        setExact(stack, normalized);
     }
 
     public static void setExact(ItemStack stack, BigDecimal value) {
@@ -41,18 +41,16 @@ public final class AdaptiveEmcValues {
         }
 
         BigDecimal normalized = normalizeInternal(value);
-        write(stack, normalized);
-    }
-
-    private static void write(ItemStack stack, BigDecimal value) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, tag ->
-                tag.putString(TAG_ADAPTIVE_EMC, value.toPlainString())
-        );
+        ProjectEnervateSourceHelper.markAdaptive(stack, normalized);
     }
 
     public static Optional<BigDecimal> get(ItemStack stack) {
         if (stack.isEmpty()) {
             return Optional.empty();
+        }
+
+        if (ProjectEnervateSourceHelper.isZero(stack)) {
+            return Optional.of(normalizeInternal(BigDecimal.ZERO));
         }
 
         CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
@@ -81,11 +79,21 @@ public final class AdaptiveEmcValues {
         CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = customData.copyTag();
 
-        if (!tag.contains(TAG_ADAPTIVE_EMC)) {
+        if (!tag.contains(TAG_ADAPTIVE_EMC)
+                && !ProjectEnervateSourceHelper.isAdaptive(stack)
+                && !ProjectEnervateSourceHelper.isZero(stack)) {
             return;
         }
 
         tag.remove(TAG_ADAPTIVE_EMC);
+        tag.remove(ProjectEnervateSourceHelper.TAG_SOURCE);
+
+        String state = tag.getString(ProjectEnervateSourceHelper.TAG_STATE);
+
+        if (ProjectEnervateSourceHelper.STATE_ADAPTIVE.equals(state)
+                || ProjectEnervateSourceHelper.STATE_ZERO.equals(state)) {
+            tag.remove(ProjectEnervateSourceHelper.TAG_STATE);
+        }
 
         if (tag.isEmpty()) {
             stack.remove(DataComponents.CUSTOM_DATA);
@@ -95,21 +103,7 @@ public final class AdaptiveEmcValues {
     }
 
     public static ItemStack copyWithoutAdaptiveEmc(ItemStack original) {
-        ItemStack copy = original.copy();
-
-        CustomData customData = copy.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
-        CompoundTag tag = customData.copyTag();
-
-        tag.remove(TAG_ADAPTIVE_EMC);
-        tag.remove(ProjectEnervateSourceHelper.TAG_SOURCE);
-
-        if (tag.isEmpty()) {
-            copy.remove(DataComponents.CUSTOM_DATA);
-        } else {
-            copy.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        }
-
-        return copy;
+        return ProjectEnervateSourceHelper.copyWithoutProjectEnervateData(original);
     }
 
     public static String format(BigDecimal value) {

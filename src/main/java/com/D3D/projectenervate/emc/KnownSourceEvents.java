@@ -11,26 +11,27 @@ public final class KnownSourceEvents {
 
     public static void onBlockDrops(BlockDropsEvent event) {
         for (ItemEntity drop : event.getDrops()) {
-            ProjectEnervateSourceHelper.markKnownIfBaseEmc(
-                    drop.getItem(),
-                    ProjectEnervateSourceHelper.SOURCE_BLOCK_DROP
-            );
+            if (ProjectEnervateSourceHelper.hasProjectEnervateData(drop.getItem())) {
+                continue;
+            }
+
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(drop.getItem());
         }
     }
 
     public static void onLivingDrops(LivingDropsEvent event) {
         for (ItemEntity drop : event.getDrops()) {
-            ProjectEnervateSourceHelper.markKnownIfBaseEmc(
-                    drop.getItem(),
-                    ProjectEnervateSourceHelper.SOURCE_LIVING_DROP
-            );
+            ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(drop.getItem());
         }
     }
 
     public static void onItemToss(ItemTossEvent event) {
-        ProjectEnervateSourceHelper.markKnownIfBaseEmc(
-                event.getEntity().getItem(),
-                ProjectEnervateSourceHelper.SOURCE_PLAYER_INVENTORY
-        );
+        // Tossing should preserve existing economic state. It should not upgrade a
+        // clean/unmarked stack just because the player is creative.
+        if (ProjectEnervateSourceHelper.hasKnownSource(event.getEntity().getItem())) {
+            return;
+        }
+
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(event.getEntity().getItem());
     }
 }

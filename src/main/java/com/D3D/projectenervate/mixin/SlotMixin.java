@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +25,8 @@ public abstract class SlotMixin {
         if (incoming.isEmpty() || amount <= 0) {
             return;
         }
+
+        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
 
         Slot slot = (Slot) (Object) this;
 

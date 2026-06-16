@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
+import com.D3D.projectenervate.client.TransmutationSearchHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
 import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
@@ -92,7 +93,7 @@ public abstract class MouseTweaksMainMixin {
 
         if (hoveredMenuSlot >= PROJECTE_FIRST_PLAYER_SLOT) {
             if (scrollDown) {
-                tryMoveOneMatchingOutputToInventory(minecraft, menu, hoveredMenuSlot);
+                tryMoveOneMatchingOutputToInventory((GUITransmutation) screen, minecraft, menu, hoveredMenuSlot);
             } else {
                 tryBurnOneFromPlayerSlot(minecraft, menu, hoveredMenuSlot);
             }
@@ -148,6 +149,7 @@ public abstract class MouseTweaksMainMixin {
     }
 
     private static void tryMoveOneMatchingOutputToInventory(
+            GUITransmutation screen,
             Minecraft minecraft,
             TransmutationContainer menu,
             int hoveredInventorySlotId
@@ -159,6 +161,9 @@ public abstract class MouseTweaksMainMixin {
         }
 
         ItemStack wantedStack = inventorySlot.getItem();
+
+        TransmutationSearchHelper.searchForStack(screen, wantedStack);
+        markAllTransmutationVisibleStacksKnown(menu);
 
         int matchingOutputSlot = findMatchingOutputSlot(menu, wantedStack);
 
@@ -371,10 +376,7 @@ public abstract class MouseTweaksMainMixin {
     }
 
     private static void markStackKnown(ItemStack stack) {
-        ProjectEnervateSourceHelper.markKnownIfBaseEmc(
-                stack,
-                ProjectEnervateSourceHelper.SOURCE_TRANSMUTATION
-        );
+        ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(stack);
     }
 
     private static void click(

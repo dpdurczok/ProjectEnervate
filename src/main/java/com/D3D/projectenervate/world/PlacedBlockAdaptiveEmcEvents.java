@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -18,6 +19,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -29,8 +31,10 @@ import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
 public final class PlacedBlockAdaptiveEmcEvents {
 
     private static final int PENDING_PLACEMENT_TIMEOUT_TICKS = 10;
+    private static final int NATURAL_DROP_BUDGET_TIMEOUT_TICKS = 20;
 
     private static final Map<UUID, PendingPlacement> PENDING_PLACEMENTS = new HashMap<>();
+    private static final Map<NaturalDropBudgetKey, NaturalDropBudget> NATURAL_DROP_BUDGETS = new HashMap<>();
 
     private PlacedBlockAdaptiveEmcEvents() {
     }
@@ -56,39 +60,13 @@ public final class PlacedBlockAdaptiveEmcEvents {
             return;
         }
 
-        Optional<BigDecimal> adaptiveValue = AdaptiveEmcValues.get(stack);
+        BigDecimal placedBlockEmc = AdaptiveEmcHelper.getSingleSellValueDecimal(stack);
 
-        if (adaptiveValue.isPresent()) {
-            PENDING_PLACEMENTS.put(
-                    event.getEntity().getUUID(),
-                    new PendingPlacement(
-                            expectedPlacedItem,
-                            adaptiveValue.get(),
-                            true,
-                            level.getGameTime()
-                    )
-            );
-            return;
-        }
-
-        if (!ProjectEnervateSourceHelper.hasSourceMarker(stack)
-                && !AdaptiveEmcValues.has(stack)
-                && ProjectEnervateSourceHelper.hasBaseEmc(stack)) {
-            PENDING_PLACEMENTS.put(
-                    event.getEntity().getUUID(),
-                    new PendingPlacement(
-                            expectedPlacedItem,
-                            BigDecimal.ZERO,
-                            true,
-                            level.getGameTime()
-                    )
-            );
-            return;
-        }
-
-        BigDecimal baseValue = AdaptiveEmcHelper.getSingleSellValueDecimal(stack);
-
-        if (baseValue.signum() <= 0) {
+        // Placement must preserve the stack's effective economic value even when the
+        // block later drops itself, drops multiple items, or drops a different item.
+        // A clean/unverified base-EMC block has an effective value of zero, so it is
+        // stored as zero instead of being allowed to become verified after breaking.
+        if (placedBlockEmc.signum() <= 0 && !ProjectEnervateSourceHelper.hasBaseEmc(stack)) {
             return;
         }
 
@@ -96,8 +74,8 @@ public final class PlacedBlockAdaptiveEmcEvents {
                 event.getEntity().getUUID(),
                 new PendingPlacement(
                         expectedPlacedItem,
-                        baseValue,
-                        false,
+                        placedBlockEmc.max(BigDecimal.ZERO),
+                        true,
                         level.getGameTime()
                 )
         );
@@ -111,6 +89,7 @@ public final class PlacedBlockAdaptiveEmcEvents {
         // Always clear stale data at this position first.
         // This prevents old EMC from surviving if the block was replaced.
         PlacedBlockAdaptiveEmcData.get(level).remove(event.getPos());
+        projectenervate$clearNaturalDropBudget(level, event.getPos());
 
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
@@ -157,6 +136,7 @@ public final class PlacedBlockAdaptiveEmcEvents {
 
     public static void onBlockDrops(BlockDropsEvent event) {
         ServerLevel level = event.getLevel();
+        projectenervate$clearNaturalDropBudget(level, event.getPos());
 
         Optional<PlacedBlockAdaptiveEmcData.Entry> storedEntry = PlacedBlockAdaptiveEmcData
                 .get(level)
@@ -182,8 +162,79 @@ public final class PlacedBlockAdaptiveEmcEvents {
         projectenervate$applyBlockEmcToDrops(entry.emc(), event.getDrops());
     }
 
+
+    public static boolean applyStoredBlockEmcToPoppedStack(Level level, BlockPos pos, ItemStack stack) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        projectenervate$clearExpiredNaturalDropBudgets(serverLevel);
+
+        NaturalDropBudgetKey key = new NaturalDropBudgetKey(serverLevel.dimension(), pos.asLong());
+        NaturalDropBudget budget = NATURAL_DROP_BUDGETS.get(key);
+
+        if (budget == null) {
+            Optional<PlacedBlockAdaptiveEmcData.Entry> storedEntry = PlacedBlockAdaptiveEmcData
+                    .get(serverLevel)
+                    .remove(pos);
+
+            if (storedEntry.isEmpty()) {
+                return false;
+            }
+
+            PlacedBlockAdaptiveEmcData.Entry entry = storedEntry.get();
+            budget = new NaturalDropBudget(
+                    entry.emc().max(BigDecimal.ZERO),
+                    entry.alwaysApply(),
+                    serverLevel.getGameTime()
+            );
+            NATURAL_DROP_BUDGETS.put(key, budget);
+        }
+
+        if (budget.remainingEmc().signum() <= 0) {
+            if (budget.alwaysApply()) {
+                ProjectEnervateSourceHelper.markUnknownSource(stack);
+                return true;
+            }
+
+            return false;
+        }
+
+        BigDecimal baseStackEmc = AdaptiveEmcOutputHelper.getBaseStackEmc(stack);
+
+        if (baseStackEmc.signum() <= 0) {
+            ProjectEnervateSourceHelper.clearProjectEnervateData(stack);
+            return true;
+        }
+
+        BigDecimal stackBudget = budget.takeUpTo(baseStackEmc);
+
+        AdaptiveEmcOutputHelper.applyCappedAdaptiveStackEmc(stack, stackBudget);
+        return true;
+    }
+
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         PENDING_PLACEMENTS.remove(event.getEntity().getUUID());
+    }
+
+
+
+    private static void projectenervate$clearNaturalDropBudget(ServerLevel level, BlockPos pos) {
+        NATURAL_DROP_BUDGETS.remove(new NaturalDropBudgetKey(level.dimension(), pos.asLong()));
+    }
+
+    private static void projectenervate$clearExpiredNaturalDropBudgets(ServerLevel level) {
+        long now = level.getGameTime();
+        ResourceKey<Level> dimension = level.dimension();
+
+        NATURAL_DROP_BUDGETS.entrySet().removeIf(entry ->
+                entry.getKey().dimension().equals(dimension)
+                        && now - entry.getValue().gameTime() > NATURAL_DROP_BUDGET_TIMEOUT_TICKS
+        );
     }
 
     private static boolean projectenervate$mightCreateLoopWhenBroken(
@@ -298,7 +349,7 @@ public final class PlacedBlockAdaptiveEmcEvents {
             BigDecimal dropBaseStackWeight = AdaptiveEmcOutputHelper.getBaseStackEmc(dropStack);
 
             if (dropBaseStackWeight.signum() <= 0) {
-                AdaptiveEmcValues.remove(dropStack);
+                ProjectEnervateSourceHelper.clearProjectEnervateData(dropStack);
                 continue;
             }
 
@@ -355,6 +406,47 @@ public final class PlacedBlockAdaptiveEmcEvents {
                     dropStack,
                     proposedDropStackEmc
             );
+        }
+    }
+
+
+    private record NaturalDropBudgetKey(
+            ResourceKey<Level> dimension,
+            long pos
+    ) {
+    }
+
+    private static final class NaturalDropBudget {
+        private BigDecimal remainingEmc;
+        private final boolean alwaysApply;
+        private final long gameTime;
+
+        private NaturalDropBudget(BigDecimal remainingEmc, boolean alwaysApply, long gameTime) {
+            this.remainingEmc = remainingEmc == null ? BigDecimal.ZERO : remainingEmc;
+            this.alwaysApply = alwaysApply;
+            this.gameTime = gameTime;
+        }
+
+        private BigDecimal remainingEmc() {
+            return remainingEmc;
+        }
+
+        private boolean alwaysApply() {
+            return alwaysApply;
+        }
+
+        private long gameTime() {
+            return gameTime;
+        }
+
+        private BigDecimal takeUpTo(BigDecimal requestedEmc) {
+            if (requestedEmc == null || requestedEmc.signum() <= 0 || remainingEmc.signum() <= 0) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal taken = remainingEmc.min(requestedEmc);
+            remainingEmc = remainingEmc.subtract(taken).max(BigDecimal.ZERO);
+            return taken;
         }
     }
 
