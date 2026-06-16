@@ -29,7 +29,8 @@
     "ItemEntityPickupUnknownSourceMixin",
     "ResultSlotKnownSourceMixin",
     "TransmutationMenuKnownSourceMixin",
-    "TransmutationQuickMoveKnownSourceMixin"
+    "TransmutationQuickMoveKnownSourceMixin",
+    "KleinStarCapacityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

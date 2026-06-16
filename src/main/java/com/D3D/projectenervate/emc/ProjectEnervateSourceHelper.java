@@ -109,7 +109,6 @@ public final class ProjectEnervateSourceHelper {
         if (hasKnownSource(stack)) {
             return false;
         }
-
         return markUnknownSource(stack);
     }
 
