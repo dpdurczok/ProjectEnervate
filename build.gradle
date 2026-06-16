@@ -130,8 +130,20 @@ configurations {
 
 dependencies {
     implementation "curse.maven:projecte-226410:6611984"
+
+    // Runtime testing mods
     runtimeOnly "curse.maven:jei-238222:7270455"
     runtimeOnly "curse.maven:mouse-tweaks-60089:5637846"
+
+    runtimeOnly "curse.maven:create-328085:7963363"
+    runtimeOnly "curse.maven:projecte-integration-313402:7921371"
+    runtimeOnly "curse.maven:ex-deorum-901420:7160864"
+
+    // Ex Deorum 3.10 says it now requires KubeJS 7.2.
+    // KubeJS requires Rhino.
+    runtimeOnly "curse.maven:rhino-416294:8218748"
+    runtimeOnly "curse.maven:kubejs-238086:8083208"
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

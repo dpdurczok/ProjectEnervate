@@ -2,6 +2,7 @@ package com.D3D.projectenervate.emc;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Optional;
 import moze_intel.projecte.api.proxy.IEMCProxy;
 import net.minecraft.world.item.ItemStack;
 
@@ -10,17 +11,6 @@ public final class AdaptiveEmcOutputHelper {
     private AdaptiveEmcOutputHelper() {
     }
 
-    /**
-     * Global ProjectEnervate output rule:
-     *
-     * If the proposed adaptive stack value is lower than the output's normal base EMC,
-     * apply adaptive EMC.
-     *
-     * If the proposed adaptive stack value is equal to or higher than the output's normal base EMC,
-     * remove adaptive EMC so the stack uses its normal/base value.
-     *
-     * If the output has no base EMC, remove adaptive EMC.
-     */
     public static void applyCappedAdaptiveStackEmc(
             ItemStack outputStack,
             BigDecimal proposedAdaptiveStackEmc
@@ -48,8 +38,6 @@ public final class AdaptiveEmcOutputHelper {
             return;
         }
 
-        // If adaptive value would be equal to or above base value,
-        // keep the item normal. This prevents overvalued adaptive outputs.
         if (proposedAdaptiveStackEmc.compareTo(baseStackEmc) >= 0) {
             AdaptiveEmcValues.remove(outputStack);
             return;
@@ -80,16 +68,13 @@ public final class AdaptiveEmcOutputHelper {
             return BigDecimal.ZERO;
         }
 
-        ItemStack cleanStack = AdaptiveEmcValues.copyWithoutAdaptiveEmc(stack);
+        BigDecimal single = getBaseSingleEmc(stack);
 
-        long baseSingleEmc = IEMCProxy.INSTANCE.getSellValue(cleanStack);
-
-        if (baseSingleEmc <= 0) {
+        if (single.signum() <= 0) {
             return BigDecimal.ZERO;
         }
 
-        return BigDecimal.valueOf(baseSingleEmc)
-                .multiply(BigDecimal.valueOf(count));
+        return single.multiply(BigDecimal.valueOf(count));
     }
 
     public static BigDecimal getBaseSingleEmc(ItemStack stack) {
@@ -98,6 +83,7 @@ public final class AdaptiveEmcOutputHelper {
         }
 
         ItemStack cleanStack = AdaptiveEmcValues.copyWithoutAdaptiveEmc(stack);
+        cleanStack.setCount(1);
 
         long baseSingleEmc = IEMCProxy.INSTANCE.getSellValue(cleanStack);
 
@@ -106,5 +92,72 @@ public final class AdaptiveEmcOutputHelper {
         }
 
         return BigDecimal.valueOf(baseSingleEmc);
+    }
+
+    public static BigDecimal getEffectiveStackEmc(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal single = AdaptiveEmcHelper.getSingleSellValueDecimal(stack);
+
+        if (single.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return single.multiply(BigDecimal.valueOf(stack.getCount()));
+    }
+
+    public static BigDecimal getEffectiveSingleEmc(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        return AdaptiveEmcHelper.getSingleSellValueDecimal(stack);
+    }
+
+    public static void copyAdaptiveState(ItemStack from, ItemStack to) {
+        if (from.isEmpty() || to.isEmpty()) {
+            return;
+        }
+
+        Optional<BigDecimal> value = AdaptiveEmcValues.get(from);
+
+        if (value.isPresent() && value.get().signum() > 0) {
+            AdaptiveEmcValues.setExact(to, value.get());
+        } else {
+            AdaptiveEmcValues.remove(to);
+        }
+    }
+
+    public static void mergeGeneratedIntoResultStack(
+            ItemStack beforeResult,
+            ItemStack afterResult,
+            int generatedCount,
+            BigDecimal generatedBudget
+    ) {
+        if (afterResult.isEmpty()) {
+            return;
+        }
+
+        if (generatedCount <= 0) {
+            return;
+        }
+
+        BigDecimal oldStackEmc = BigDecimal.ZERO;
+
+        if (!beforeResult.isEmpty()) {
+            oldStackEmc = getEffectiveStackEmc(beforeResult);
+        }
+
+        ItemStack generatedStack = afterResult.copy();
+        generatedStack.setCount(generatedCount);
+
+        applyCappedAdaptiveStackEmc(generatedStack, generatedBudget);
+
+        BigDecimal generatedFinalEmc = getEffectiveStackEmc(generatedStack);
+        BigDecimal combinedEmc = oldStackEmc.add(generatedFinalEmc);
+
+        applyCappedAdaptiveStackEmc(afterResult, combinedEmc);
     }
 }

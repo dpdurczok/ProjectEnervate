@@ -18,7 +18,12 @@
     "ResultSlotAccessor",
     "CraftingResultSlotPreviewMixin",
     "MerchantContainerMixin",
-    "MerchantResultSlotMixin"
+    "MerchantResultSlotMixin",
+    "RecipeManagerMixin",
+    "AbstractFurnaceBlockEntityMixin",
+    "StonecutterMenuMixin",
+    "ItemCombinerMenuMixin",
+    "BucketItemMixin"
   ],
   "injectors": {
     "defaultRequire": 1

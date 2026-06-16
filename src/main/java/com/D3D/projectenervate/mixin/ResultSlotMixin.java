@@ -20,7 +20,7 @@ public abstract class ResultSlotMixin {
     private CraftingContainer craftSlots;
 
     @Inject(method = "onTake", at = @At("HEAD"))
-    private void projectenervate$applyAdaptiveEmcToCraftingResultOnTake(
+    private void projectenervate$prepareCraftingConversion(
             Player player,
             ItemStack craftedStack,
             CallbackInfo ci
@@ -29,6 +29,19 @@ public abstract class ResultSlotMixin {
             return;
         }
 
-        CraftingAdaptiveEmcHelper.applyToCraftingOutput(craftSlots, craftedStack);
+        CraftingAdaptiveEmcHelper.prepareForTake(craftSlots, craftedStack);
+    }
+
+    @Inject(method = "onTake", at = @At("RETURN"))
+    private void projectenervate$clearCraftingConversion(
+            Player player,
+            ItemStack craftedStack,
+            CallbackInfo ci
+    ) {
+        if (player.level().isClientSide) {
+            return;
+        }
+
+        CraftingAdaptiveEmcHelper.clearPreparedTake();
     }
 }
