@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.emc;
 
 import com.D3D.projectenervate.ProjectEnervateConfig;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -83,9 +84,17 @@ public final class ProjectECollectorDisabler {
             return recipes;
         }
 
-        return (List) recipes.stream()
-                .filter(recipe -> recipe instanceof RecipeHolder<?> holder && !isCollectorRecipe(holder, registryAccess))
-                .toList();
+        List filtered = new ArrayList();
+
+        for (Object recipe : recipes) {
+            if (recipe instanceof RecipeHolder<?> holder && isCollectorRecipe(holder, registryAccess)) {
+                continue;
+            }
+
+            filtered.add(recipe);
+        }
+
+        return filtered;
     }
 
     public static Collection<RecipeHolder<?>> filterCollection(
@@ -96,8 +105,14 @@ public final class ProjectECollectorDisabler {
             return recipes;
         }
 
-        return recipes.stream()
-                .filter(recipe -> !isCollectorRecipe(recipe, registryAccess))
-                .toList();
+        List<RecipeHolder<?>> filtered = new ArrayList<>();
+
+        for (RecipeHolder<?> recipe : recipes) {
+            if (!isCollectorRecipe(recipe, registryAccess)) {
+                filtered.add(recipe);
+            }
+        }
+
+        return filtered;
     }
 }

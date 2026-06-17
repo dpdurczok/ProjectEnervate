@@ -1,13 +1,17 @@
 package com.D3D.projectenervate.mixin;
 
+import com.D3D.projectenervate.emc.AdaptiveEmcConversionHelper;
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
-import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.StonecutterMenu;
 import net.minecraft.world.item.ItemStack;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import org.spongepowered.asm.mixin.Final;
@@ -40,6 +44,12 @@ public abstract class AbstractContainerMenuMixin {
 
     @Unique
     private boolean projectenervate$adaptiveMenuMerged;
+
+    @Unique
+    private BigDecimal projectenervate$pendingStonecutterBudget;
+
+    @Unique
+    private ItemStack projectenervate$pendingStonecutterOutput = ItemStack.EMPTY;
 
     @Inject(
             method = "clicked(IILnet/minecraft/world/inventory/ClickType;Lnet/minecraft/world/entity/player/Player;)V",
@@ -131,8 +141,8 @@ public abstract class AbstractContainerMenuMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(carried);
-
+        // GUI movement is not an item-creation boundary. Do not mark clean stacks
+        // as zero here; untrusted stacks are still constrained at burn/pickup/source boundaries.
         int maxMove = button == 0 ? carried.getCount() : 1;
 
         int moved = AdaptiveEmcHelper.mergeIntoSlot(slot, carried, maxMove);
@@ -166,8 +176,8 @@ public abstract class AbstractContainerMenuMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
-
+        // Shift-click movement must preserve/rebalance existing economic state,
+        // not decide that an unmarked carried/result stack is fake.
         projectenervate$adaptiveMenuMerged = AdaptiveEmcHelper.mergeIntoMenuSlots(
                 slots,
                 incoming,
@@ -200,33 +210,85 @@ public abstract class AbstractContainerMenuMixin {
 
     @Inject(
             method = "clicked(IILnet/minecraft/world/inventory/ClickType;Lnet/minecraft/world/entity/player/Player;)V",
-            at = @At("RETURN")
+            at = @At("HEAD")
     )
-    private void projectenervate$zeroUntrackedCarriedAndClickedStacksAfterClick(
+    private void projectenervate$captureStonecutterResultBeforeClick(
             int slotIndex,
             int button,
             ClickType clickType,
             Player player,
             CallbackInfo ci
     ) {
-        boolean changed = false;
-        ItemStack carried = getCarried();
+        projectenervate$pendingStonecutterBudget = null;
+        projectenervate$pendingStonecutterOutput = ItemStack.EMPTY;
 
-        if (!carried.isEmpty() && ProjectEnervateSourceHelper.enforceUnknownMinimum(carried)) {
-            changed = true;
+        if (!((Object) this instanceof StonecutterMenu)) {
+            return;
         }
 
-        if (slotIndex >= 0 && slotIndex < slots.size()) {
-            Slot slot = slots.get(slotIndex);
+        if (clickType != ClickType.PICKUP || (button != 0 && button != 1)) {
+            return;
+        }
 
-            if (slot.hasItem() && ProjectEnervateSourceHelper.enforceUnknownMinimum(slot.getItem())) {
-                slot.setChanged();
-                changed = true;
+        // Vanilla stonecutter layout: slot 0 is input, slot 1 is result.
+        if (slotIndex != 1 || slots.size() <= 1) {
+            return;
+        }
+
+        Slot inputSlot = slots.get(0);
+        Slot resultSlot = slots.get(1);
+
+        if (!inputSlot.hasItem() || !resultSlot.hasItem()) {
+            return;
+        }
+
+        projectenervate$pendingStonecutterBudget = AdaptiveEmcConversionHelper.getOneItemBudget(inputSlot.getItem());
+        projectenervate$pendingStonecutterOutput = resultSlot.getItem().copy();
+    }
+
+    @Inject(
+            method = "clicked(IILnet/minecraft/world/inventory/ClickType;Lnet/minecraft/world/entity/player/Player;)V",
+            at = @At("RETURN")
+    )
+    private void projectenervate$applyStonecutterStateToCarriedResult(
+            int slotIndex,
+            int button,
+            ClickType clickType,
+            Player player,
+            CallbackInfo ci
+    ) {
+        if (projectenervate$pendingStonecutterBudget == null
+                || projectenervate$pendingStonecutterOutput.isEmpty()) {
+            return;
+        }
+
+        try {
+            ItemStack carried = getCarried();
+
+            if (carried.isEmpty()) {
+                return;
             }
-        }
 
-        if (changed) {
+            if (!AdaptiveEmcHelper.canMergeIgnoringProjectEnervateMetadata(
+                    carried,
+                    projectenervate$pendingStonecutterOutput
+            )) {
+                return;
+            }
+
+            List<ItemStack> outputs = new ArrayList<>(1);
+            outputs.add(carried);
+
+            AdaptiveEmcConversionHelper.applyBudgetToOutputsInPlace(
+                    projectenervate$pendingStonecutterBudget,
+                    outputs
+            );
+
+            setCarried(carried);
             broadcastChanges();
+        } finally {
+            projectenervate$pendingStonecutterBudget = null;
+            projectenervate$pendingStonecutterOutput = ItemStack.EMPTY;
         }
     }
 

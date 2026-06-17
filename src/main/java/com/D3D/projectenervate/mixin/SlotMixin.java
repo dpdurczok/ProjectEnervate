@@ -1,7 +1,6 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
-import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,8 +25,7 @@ public abstract class SlotMixin {
             return;
         }
 
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
-
+        // safeInsert is also a movement path. Preserve/rebalance existing state only.
         Slot slot = (Slot) (Object) this;
 
         int moved = AdaptiveEmcHelper.mergeIntoSlot(slot, incoming, amount);

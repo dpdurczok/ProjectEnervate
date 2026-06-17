@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "projectenervate:block/emc_assignment_station"
+    }
+  }
+}

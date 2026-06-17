@@ -2,6 +2,7 @@ package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcConversionHelper;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.world.Container;
 import net.minecraft.world.inventory.ResultContainer;
@@ -36,9 +37,12 @@ public abstract class StonecutterMenuMixin {
 
         BigDecimal inputBudget = AdaptiveEmcConversionHelper.getOneItemBudget(inputStack);
 
+        List<ItemStack> outputs = new ArrayList<>(1);
+        outputs.add(outputStack);
+
         AdaptiveEmcConversionHelper.applyBudgetToOutputsInPlace(
                 inputBudget,
-                List.of(outputStack)
+                outputs
         );
     }
 }

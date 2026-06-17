@@ -1,0 +1,13 @@
+{
+  "block.projectenervate.emc_assignment_station": "EMC Assignment Table",
+  "item.projectenervate.emc_assignment_station": "EMC Assignment Table",
+  "container.projectenervate.emc_assignment_station": "EMC Assignment Table",
+  "projectenervate.configuration.void_unknown_sources": "Void Unknown Sources",
+  "projectenervate.configuration.adaptive_emc": "Adaptive EMC",
+  "projectenervate.configuration.disable_collectors": "Disable Collectors",
+  "projectenervate.configuration.cap_max_emc_to_klein_stars": "Cap Max EMC to Klein Stars",
+  "item.projectenervate.celestial_mapping": "Celestial Mapping",
+  "container.projectenervate.celestial_mapping": "Celestial Mapping",
+  "projectenervate.configuration.enable_random_courses": "Enable Random Courses",
+  "projectenervate.configuration.random_course_resources": "Random Course Resources"
+}

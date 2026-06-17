@@ -1,7 +1,6 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
-import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.Inventory;
@@ -113,9 +112,8 @@ public abstract class InventoryMixin {
 
     @Unique
     private void projectenervate$prepareIncomingStack(ItemStack incoming) {
-        // Do not trust every stack merely because the receiving player is in creative.
-        // Machine outputs picked up during creative testing also pass through Inventory.add.
-        // Actual creative/JEI granted stacks need a dedicated creative-source hook.
-        ProjectEnervateSourceHelper.enforceUnknownMinimum(incoming);
+        // Inventory insertion is movement, not creation. Do not zero clean stacks here.
+        // Unknown-source protection still happens at actual source/burn boundaries, while
+        // this hook only gives ProjectEnervate stacks a chance to merge without losing value.
     }
 }
