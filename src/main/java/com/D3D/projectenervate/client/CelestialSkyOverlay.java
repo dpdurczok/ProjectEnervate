@@ -30,7 +30,7 @@ public final class CelestialSkyOverlay {
             "textures/gui/celestial_star_sky.png"
     );
 
-    private static final double MIN_STAR_WORLD_SIZE = 1.5D;
+    private static final double MIN_STAR_WORLD_SIZE = 2D;
     private static final double MID_STAR_WORLD_SIZE = 3.0D;
     private static final double MAX_STAR_WORLD_SIZE = 10.0D;
 
@@ -48,8 +48,8 @@ public final class CelestialSkyOverlay {
      * Constellation controls.
      * Distances are sky angle degrees between star centers inside the moon-side sky field.
      */
-    private static final int MIN_CONSTELLATION_SIZE = 3;
-    private static final int MAX_CONSTELLATION_SIZE = 5;
+    private static final int MIN_CONSTELLATION_SIZE = 2;
+    private static final int MAX_CONSTELLATION_SIZE = 6;
     private static final double MIN_CONSTELLATION_STAR_DISTANCE_DEGREES = 7.0D;
     private static final double MAX_CONSTELLATION_STAR_DISTANCE_DEGREES = 14.0D;
 
@@ -344,30 +344,34 @@ public final class CelestialSkyOverlay {
         }
 
         List<CelestialMappingMenu.CelestialBodyView> orderedBodies = new ArrayList<>(bodies);
-        orderedBodies.sort(Comparator.comparingLong(body -> mix64(starSeedFor(body, skySeed) ^ 0x4f524445525f5354L)));
+        orderedBodies.sort(Comparator.comparingInt(CelestialMappingMenu.CelestialBodyView::starId));
 
-        SeededRandom groupRandom = new SeededRandom(mix64(skySeed ^ 0x434f4e5354454c4cL));
         List<LocalConstellation> localConstellations = new ArrayList<>();
-
         int index = 0;
         int constellationIndex = 0;
+
         while (index < orderedBodies.size()) {
             int remaining = orderedBodies.size() - index;
-            int constellationSize = chooseConstellationSize(remaining, groupRandom);
-            List<CelestialMappingMenu.CelestialBodyView> group = new ArrayList<>(orderedBodies.subList(index, index + constellationSize));
+            int targetSize = chooseConstellationTargetSize(constellationIndex, skySeed);
+            int visibleSize = Math.min(targetSize, remaining);
 
-            long firstBodySeed = group.isEmpty() ? 0L : starSeedFor(group.get(0), skySeed);
+            if (visibleSize < Math.max(1, MIN_CONSTELLATION_SIZE)) {
+                break;
+            }
+
+            List<CelestialMappingMenu.CelestialBodyView> group = new ArrayList<>(orderedBodies.subList(index, index + visibleSize));
             SeededRandom shapeRandom = new SeededRandom(mix64(
                     skySeed
-                            ^ firstBodySeed
                             ^ ((long) constellationIndex * 0x9E3779B97F4A7C15L)
                             ^ 0x53484150455f5354L
             ));
 
-            GeneratedShape shape = growConstellationShape(group.size(), shapeRandom);
-            localConstellations.add(new LocalConstellation(group, shape.points(), shape.radiusDegrees()));
+            GeneratedShape fullShape = growConstellationShape(targetSize, shapeRandom);
+            List<SkyPoint> visiblePoints = new ArrayList<>(fullShape.points().subList(0, visibleSize));
+            List<SkyPoint> placementPoints = new ArrayList<>(fullShape.points());
+            localConstellations.add(new LocalConstellation(group, visiblePoints, placementPoints, fullShape.radiusDegrees(), constellationIndex));
 
-            index += constellationSize;
+            index += visibleSize;
             constellationIndex++;
         }
 
@@ -375,9 +379,8 @@ public final class CelestialSkyOverlay {
         List<StarPlacement> placements = new ArrayList<>(orderedBodies.size());
         SeededRandom placementRandom = new SeededRandom(mix64(skySeed ^ 0x504c4143455f5354L));
 
-        for (int i = 0; i < localConstellations.size(); i++) {
-            LocalConstellation local = localConstellations.get(i);
-            SkyPoint center = chooseConstellationCenter(local, placedConstellations, placementRandom, skySeed, i);
+        for (LocalConstellation local : localConstellations) {
+            SkyPoint center = chooseConstellationCenter(local, placedConstellations, placementRandom, skySeed, local.constellationIndex());
             List<SkyPoint> finalPoints = new ArrayList<>(local.points().size());
 
             for (int j = 0; j < local.points().size(); j++) {
@@ -387,33 +390,27 @@ public final class CelestialSkyOverlay {
                 placements.add(new StarPlacement(local.bodies().get(j), finalPoint.x(), finalPoint.y()));
             }
 
-            placedConstellations.add(new PlacedConstellation(center.x(), center.y(), local.radiusDegrees(), finalPoints));
+            List<SkyPoint> placementFinalPoints = new ArrayList<>(local.placementPoints().size());
+            for (SkyPoint localPoint : local.placementPoints()) {
+                placementFinalPoints.add(new SkyPoint(center.x() + localPoint.x(), center.y() + localPoint.y()));
+            }
+
+            placedConstellations.add(new PlacedConstellation(center.x(), center.y(), local.radiusDegrees(), placementFinalPoints));
         }
 
+        placements.sort(Comparator.comparingInt(placement -> placement.body().starId()));
         return placements;
     }
 
-    private static int chooseConstellationSize(int remaining, SeededRandom random) {
+    private static int chooseConstellationTargetSize(int constellationIndex, long skySeed) {
         int minSize = Math.max(1, Math.min(MIN_CONSTELLATION_SIZE, MAX_CONSTELLATION_SIZE));
         int maxSize = Math.max(minSize, MAX_CONSTELLATION_SIZE);
-
-        if (remaining <= maxSize) {
-            return remaining;
-        }
-
-        List<Integer> candidates = new ArrayList<>();
-        for (int size = minSize; size <= maxSize && size <= remaining; size++) {
-            int after = remaining - size;
-            if (after == 0 || after >= minSize) {
-                candidates.add(size);
-            }
-        }
-
-        if (candidates.isEmpty()) {
-            return Math.min(maxSize, remaining);
-        }
-
-        return candidates.get(random.nextInt(candidates.size()));
+        SeededRandom random = new SeededRandom(mix64(
+                skySeed
+                        ^ ((long) constellationIndex * 0x94d049bb133111ebL)
+                        ^ 0x53495a455f535441L
+        ));
+        return minSize + random.nextInt(maxSize - minSize + 1);
     }
 
     private static GeneratedShape growConstellationShape(int size, SeededRandom random) {
@@ -538,24 +535,15 @@ public final class CelestialSkyOverlay {
             return new GeneratedShape(List.of(), 0.0D);
         }
 
-        double averageX = 0.0D;
-        double averageY = 0.0D;
-        for (SkyPoint point : rawPoints) {
-            averageX += point.x();
-            averageY += point.y();
-        }
-        averageX /= rawPoints.size();
-        averageY /= rawPoints.size();
-
-        List<SkyPoint> centeredPoints = new ArrayList<>(rawPoints.size());
+        List<SkyPoint> stablePoints = new ArrayList<>(rawPoints.size());
         double radius = 0.0D;
+
         for (SkyPoint point : rawPoints) {
-            SkyPoint centered = new SkyPoint(point.x() - averageX, point.y() - averageY);
-            centeredPoints.add(centered);
-            radius = Math.max(radius, length(centered));
+            stablePoints.add(point);
+            radius = Math.max(radius, length(point));
         }
 
-        return new GeneratedShape(centeredPoints, radius);
+        return new GeneratedShape(stablePoints, radius);
     }
 
     private static SkyPoint chooseConstellationCenter(
@@ -621,9 +609,9 @@ public final class CelestialSkyOverlay {
             List<PlacedConstellation> placedConstellations
     ) {
         double score = 0.0D;
-        List<SkyPoint> candidatePoints = new ArrayList<>(local.points().size());
+        List<SkyPoint> candidatePoints = new ArrayList<>(local.placementPoints().size());
 
-        for (SkyPoint localPoint : local.points()) {
+        for (SkyPoint localPoint : local.placementPoints()) {
             SkyPoint finalPoint = new SkyPoint(center.x() + localPoint.x(), center.y() + localPoint.y());
             candidatePoints.add(finalPoint);
 
@@ -719,8 +707,7 @@ public final class CelestialSkyOverlay {
 
     private static long starSeedFor(CelestialMappingMenu.CelestialBodyView body, long skySeed) {
         long value = skySeed;
-        value ^= ((long) body.resourceId().hashCode()) * 0x9E3779B97F4A7C15L;
-        value ^= Long.rotateLeft((long) body.celestialName().hashCode(), 32);
+        value ^= ((long) body.starId()) * 0x9E3779B97F4A7C15L;
         return mix64(value);
     }
 
@@ -754,7 +741,9 @@ public final class CelestialSkyOverlay {
     private record LocalConstellation(
             List<CelestialMappingMenu.CelestialBodyView> bodies,
             List<SkyPoint> points,
-            double radiusDegrees
+            List<SkyPoint> placementPoints,
+            double radiusDegrees,
+            int constellationIndex
     ) {
     }
 

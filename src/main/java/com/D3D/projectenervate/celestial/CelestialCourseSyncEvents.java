@@ -49,7 +49,9 @@ public final class CelestialCourseSyncEvents {
                 continue;
             }
 
-            builder.append(clean(body.resourceId()))
+            builder.append(body.starId())
+                    .append('\t')
+                    .append(clean(body.resourceId()))
                     .append('\t')
                     .append(clean(body.celestialName()))
                     .append('\t')

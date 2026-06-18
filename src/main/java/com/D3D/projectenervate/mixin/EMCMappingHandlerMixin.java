@@ -1,7 +1,9 @@
 package com.D3D.projectenervate.mixin;
 
+import com.D3D.projectenervate.ProjectEnervateConfig;
+import com.D3D.projectenervate.emc.BacktrackedBaseEmcMapper;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import com.D3D.projectenervate.emc.VanillaEmcDefaults;
+import java.util.Set;
 import moze_intel.projecte.api.ItemInfo;
 import moze_intel.projecte.api.nss.NSSItem;
 import moze_intel.projecte.config.CustomEMCParser;
@@ -15,13 +17,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class EMCMappingHandlerMixin {
 
     @Inject(method = "updateEmcValues", at = @At("HEAD"))
-    private static void projectenervate$forceCustomEmcIntoFinalMap(
+    private static void projectenervate$forceCustomAndBacktrackedEmcIntoFinalMap(
             Object2LongMap<ItemInfo> data,
             CallbackInfoReturnable<Integer> cir
     ) {
-        VanillaEmcDefaults.apply(data);
+        Set<ItemInfo> customRemovedItems = BacktrackedBaseEmcMapper.collectCustomRemovedItems();
 
-        if (CustomEMCParser.currentEntries == null) {
+        projectenervate$applyCustomEmc(data);
+
+        if (ProjectEnervateConfig.backtrackMissingBaseEmc()) {
+            BacktrackedBaseEmcMapper.apply(data, customRemovedItems);
+        }
+
+        projectenervate$applyCustomEmc(data);
+    }
+
+    private static void projectenervate$applyCustomEmc(Object2LongMap<ItemInfo> data) {
+        if (data == null || CustomEMCParser.currentEntries == null) {
             return;
         }
 

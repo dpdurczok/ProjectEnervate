@@ -38,16 +38,17 @@ public final class CelestialClientCourseState {
                 continue;
             }
 
-            String[] parts = line.split("\\t", 3);
-            if (parts.length != 3) {
+            String[] parts = line.split("\\t", 4);
+            if (parts.length != 4) {
                 continue;
             }
 
             try {
                 parsed.add(new CelestialMappingMenu.CelestialBodyView(
-                        parts[0],
+                        Integer.parseInt(parts[0]),
                         parts[1],
-                        Double.parseDouble(parts[2])
+                        parts[2],
+                        Double.parseDouble(parts[3])
                 ));
             } catch (NumberFormatException ignored) {
             }
@@ -66,7 +67,9 @@ public final class CelestialClientCourseState {
                 continue;
             }
 
-            builder.append(clean(body.resourceId()))
+            builder.append(body.starId())
+                    .append('\t')
+                    .append(clean(body.resourceId()))
                     .append('\t')
                     .append(clean(body.celestialName()))
                     .append('\t')
@@ -87,18 +90,18 @@ public final class CelestialClientCourseState {
 
     private static List<CelestialMappingMenu.CelestialBodyView> defaultBodies() {
         return List.of(
-                new CelestialMappingMenu.CelestialBodyView("minecraft:diamond", "Adamantis", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:amethyst_shard", "Amethys", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:raw_gold", "Aurum", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:coal", "Carbona", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:raw_copper", "Cupria", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:raw_iron", "Ferrum", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:lapis_lazuli", "Lazula", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:glowstone_dust", "Lumina", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:ancient_debris", "Nethera", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:quartz", "Quartzia", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:redstone", "Rubra", 1.0D),
-                new CelestialMappingMenu.CelestialBodyView("minecraft:emerald", "Smaragda", 1.0D)
+                new CelestialMappingMenu.CelestialBodyView(0, "minecraft:coal", "Carbona", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(1, "minecraft:raw_iron", "Ferrum", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(2, "minecraft:raw_copper", "Cupria", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(3, "minecraft:raw_gold,minecraft:gold_nugget", "Aurum", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(4, "minecraft:diamond", "Adamantis", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(5, "minecraft:emerald", "Smaragda", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(6, "minecraft:lapis_lazuli", "Lazula", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(7, "minecraft:redstone", "Rubra", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(8, "minecraft:quartz", "Quartzia", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(9, "minecraft:glowstone_dust", "Lumina", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(10, "minecraft:amethyst_shard", "Amethys", 1.0D),
+                new CelestialMappingMenu.CelestialBodyView(11, "minecraft:ancient_debris", "Nethera", 1.0D)
         );
     }
 }

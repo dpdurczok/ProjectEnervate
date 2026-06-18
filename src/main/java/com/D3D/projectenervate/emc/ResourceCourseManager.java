@@ -4,13 +4,10 @@ import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -72,9 +69,10 @@ public final class ResourceCourseManager {
             return false;
         }
 
-        ResourceLocation resource = getConfiguredCanonicalResource(stack);
+        ResourceLocation canonicalResource = canonicalResourceForStack(stack);
+        StarDefinitionManager.ActiveStar star = StarDefinitionManager.findActiveStarForStack(stack, canonicalResource);
 
-        if (resource == null) {
+        if (star == null) {
             return false;
         }
 
@@ -84,51 +82,68 @@ public final class ResourceCourseManager {
             return false;
         }
 
-        CourseSnapshot snapshot = currentSnapshot(level, configuredCourseBodies(configuredResources()));
-        ResourceLocation courseBody = courseBodyForResource(resource);
-        BigDecimal multiplier = snapshot.currentMultipliers.getOrDefault(courseBody, STANDARD_MULTIPLIER);
+        CourseSnapshot snapshot = currentSnapshot(level, StarDefinitionManager.activeStars());
+        BigDecimal multiplier = snapshot.currentMultipliers.getOrDefault(star.index(), STANDARD_MULTIPLIER);
         BigDecimal proposedStackEmc = baseStackEmc.multiply(multiplier);
 
         AdaptiveEmcOutputHelper.applyUncappedAdaptiveStackEmc(stack, proposedStackEmc);
         return true;
     }
 
+    public static List<StarCourseView> currentStarCourses(ServerLevel level) {
+        List<StarDefinitionManager.ActiveStar> stars = StarDefinitionManager.activeStars();
+        List<StarCourseView> result = new ArrayList<>();
+
+        if (stars.isEmpty()) {
+            return result;
+        }
+
+        Map<Integer, BigDecimal> multipliers = ProjectEnervateConfig.enableRandomCourses()
+                ? currentSnapshot(level, stars).currentMultipliers
+                : standardMultipliers(stars);
+
+        for (StarDefinitionManager.ActiveStar star : stars) {
+            result.add(new StarCourseView(
+                    star.index(),
+                    star.name(),
+                    star.configuredResources(),
+                    star.activeResources(),
+                    multipliers.getOrDefault(star.index(), STANDARD_MULTIPLIER)
+            ));
+        }
+
+        return result;
+    }
+
     public static Map<ResourceLocation, BigDecimal> currentMultipliers(ServerLevel level) {
-        Set<ResourceLocation> resources = configuredResources();
         Map<ResourceLocation, BigDecimal> result = new LinkedHashMap<>();
 
-        if (resources.isEmpty()) {
-            return result;
-        }
-
-        if (!ProjectEnervateConfig.enableRandomCourses()) {
-            for (ResourceLocation resource : resources) {
-                result.put(resource, STANDARD_MULTIPLIER);
+        for (StarCourseView star : currentStarCourses(level)) {
+            for (ResourceLocation concrete : StarDefinitionManager.activeConcreteItemResources(new StarDefinitionManager.ActiveStar(
+                    star.index(),
+                    star.name(),
+                    star.configuredResources(),
+                    star.activeResources()
+            ))) {
+                result.put(concrete, star.multiplier());
             }
-            return result;
-        }
-
-        Map<ResourceLocation, BigDecimal> bodyMultipliers = currentSnapshot(level, configuredCourseBodies(resources)).currentMultipliers;
-
-        for (ResourceLocation resource : resources) {
-            result.put(resource, bodyMultipliers.getOrDefault(courseBodyForResource(resource), STANDARD_MULTIPLIER));
         }
 
         return result;
     }
 
     public static String currentCourseStatus(ServerLevel level) {
-        Set<ResourceLocation> resources = configuredResources();
+        List<StarDefinitionManager.ActiveStar> stars = StarDefinitionManager.activeStars();
 
-        if (resources.isEmpty()) {
-            return "no configured resources";
+        if (stars.isEmpty()) {
+            return "no active configured stars";
         }
 
         if (!ProjectEnervateConfig.enableRandomCourses()) {
             return "disabled";
         }
 
-        CourseSnapshot snapshot = currentSnapshot(level, configuredCourseBodies(resources));
+        CourseSnapshot snapshot = currentSnapshot(level, stars);
         return "seeded course " + snapshot.courseIndex
                 + ", dayTime " + snapshot.dayTime
                 + ", course ticks " + snapshot.courseStartTick + "-" + snapshot.courseEndTick;
@@ -166,74 +181,22 @@ public final class ResourceCourseManager {
         };
     }
 
-    private static ResourceLocation getConfiguredCanonicalResource(ItemStack stack) {
-        ResourceLocation resource = canonicalResourceForStack(stack);
-
-        if (resource == null) {
-            return null;
-        }
-
-        return configuredResources().contains(resource) ? resource : null;
-    }
-
-    private static Set<ResourceLocation> configuredResources() {
-        LinkedHashSet<ResourceLocation> result = new LinkedHashSet<>();
-
-        for (String raw : ProjectEnervateConfig.randomCourseResources()) {
-            if (raw == null || raw.isBlank()) {
-                continue;
-            }
-
-            ResourceLocation id = ResourceLocation.tryParse(raw.trim());
-
-            if (id != null) {
-                result.add(id);
-            }
-        }
-
-        return result;
-    }
-
-
-    private static Set<ResourceLocation> configuredCourseBodies(Set<ResourceLocation> resources) {
-        LinkedHashSet<ResourceLocation> result = new LinkedHashSet<>();
-
-        for (ResourceLocation resource : resources) {
-            result.add(courseBodyForResource(resource));
-        }
-
-        return result;
-    }
-
-    private static ResourceLocation courseBodyForResource(ResourceLocation resource) {
-        if (resource == null) {
-            return null;
-        }
-
-        if ("minecraft".equals(resource.getNamespace())
-                && ("raw_gold".equals(resource.getPath()) || "gold_nugget".equals(resource.getPath()))) {
-            return minecraft("raw_gold");
-        }
-
-        return resource;
-    }
-
-    private static CourseSnapshot currentSnapshot(ServerLevel level, Set<ResourceLocation> resources) {
+    private static CourseSnapshot currentSnapshot(ServerLevel level, List<StarDefinitionManager.ActiveStar> stars) {
         long seed = resolveCourseSeed(level);
         long dayTime = resolveCourseDayTime(level);
         long courseStartTick = 0L;
         long courseIndex = 0L;
-        Map<ResourceLocation, BigDecimal> startMultipliers = standardMultipliers(resources);
-        Map<ResourceLocation, BigDecimal> targetMultipliers;
+        Map<Integer, BigDecimal> startMultipliers = standardMultipliers(stars);
+        Map<Integer, BigDecimal> targetMultipliers;
 
         for (int scanCount = 0; scanCount < MAX_COURSE_SCAN_COUNT; scanCount++) {
-            targetMultipliers = generateTargetMultipliers(resources, randomFor(seed, courseIndex, 0x434f55525345544cL));
+            targetMultipliers = generateTargetMultipliers(seed, courseIndex, stars);
             long durationTicks = randomDurationTicks(randomFor(seed, courseIndex, 0x434f555253454455L));
             long courseEndTick = safeAdd(courseStartTick, durationTicks);
 
             if (dayTime < courseEndTick || courseEndTick == Long.MAX_VALUE) {
-                Map<ResourceLocation, BigDecimal> currentMultipliers = calculateCurrentMultipliers(
-                        resources,
+                Map<Integer, BigDecimal> currentMultipliers = calculateCurrentMultipliers(
+                        stars,
                         startMultipliers,
                         targetMultipliers,
                         courseStartTick,
@@ -249,17 +212,17 @@ public final class ResourceCourseManager {
             courseIndex++;
         }
 
-        return fallbackSnapshot(seed, dayTime, resources);
+        return fallbackSnapshot(seed, dayTime, stars);
     }
 
-    private static CourseSnapshot fallbackSnapshot(long seed, long dayTime, Set<ResourceLocation> resources) {
+    private static CourseSnapshot fallbackSnapshot(long seed, long dayTime, List<StarDefinitionManager.ActiveStar> stars) {
         long estimatedIndex = Math.max(0L, dayTime / (MINECRAFT_DAY_TICKS * 5L));
         long courseStartTick = Math.max(0L, estimatedIndex * MINECRAFT_DAY_TICKS * 5L);
         long courseEndTick = safeAdd(courseStartTick, MINECRAFT_DAY_TICKS * 5L);
-        Map<ResourceLocation, BigDecimal> startMultipliers = generateTargetMultipliers(resources, randomFor(seed, Math.max(0L, estimatedIndex - 1L), 0x434f55525345544cL));
-        Map<ResourceLocation, BigDecimal> targetMultipliers = generateTargetMultipliers(resources, randomFor(seed, estimatedIndex, 0x434f55525345544cL));
-        Map<ResourceLocation, BigDecimal> currentMultipliers = calculateCurrentMultipliers(
-                resources,
+        Map<Integer, BigDecimal> startMultipliers = generateTargetMultipliers(seed, Math.max(0L, estimatedIndex - 1L), stars);
+        Map<Integer, BigDecimal> targetMultipliers = generateTargetMultipliers(seed, estimatedIndex, stars);
+        Map<Integer, BigDecimal> currentMultipliers = calculateCurrentMultipliers(
+                stars,
                 startMultipliers,
                 targetMultipliers,
                 courseStartTick,
@@ -289,30 +252,30 @@ public final class ResourceCourseManager {
         return overworld == null ? level : overworld;
     }
 
-    private static Map<ResourceLocation, BigDecimal> standardMultipliers(Set<ResourceLocation> resources) {
-        Map<ResourceLocation, BigDecimal> result = new LinkedHashMap<>();
+    private static Map<Integer, BigDecimal> standardMultipliers(List<StarDefinitionManager.ActiveStar> stars) {
+        Map<Integer, BigDecimal> result = new LinkedHashMap<>();
 
-        for (ResourceLocation resource : resources) {
-            result.put(resource, STANDARD_MULTIPLIER);
+        for (StarDefinitionManager.ActiveStar star : stars) {
+            result.put(star.index(), STANDARD_MULTIPLIER);
         }
 
         return result;
     }
 
-    private static Map<ResourceLocation, BigDecimal> calculateCurrentMultipliers(
-            Set<ResourceLocation> resources,
-            Map<ResourceLocation, BigDecimal> startMultipliers,
-            Map<ResourceLocation, BigDecimal> targetMultipliers,
+    private static Map<Integer, BigDecimal> calculateCurrentMultipliers(
+            List<StarDefinitionManager.ActiveStar> stars,
+            Map<Integer, BigDecimal> startMultipliers,
+            Map<Integer, BigDecimal> targetMultipliers,
             long courseStartTick,
             long courseEndTick,
             long dayTime
     ) {
-        Map<ResourceLocation, BigDecimal> result = new LinkedHashMap<>();
+        Map<Integer, BigDecimal> result = new LinkedHashMap<>();
 
-        for (ResourceLocation resource : resources) {
-            BigDecimal start = startMultipliers.getOrDefault(resource, STANDARD_MULTIPLIER);
-            BigDecimal target = targetMultipliers.getOrDefault(resource, STANDARD_MULTIPLIER);
-            result.put(resource, calculateCurrentMultiplier(start, target, courseStartTick, courseEndTick, dayTime));
+        for (StarDefinitionManager.ActiveStar star : stars) {
+            BigDecimal start = startMultipliers.getOrDefault(star.index(), STANDARD_MULTIPLIER);
+            BigDecimal target = targetMultipliers.getOrDefault(star.index(), STANDARD_MULTIPLIER);
+            result.put(star.index(), calculateCurrentMultiplier(start, target, courseStartTick, courseEndTick, dayTime));
         }
 
         return result;
@@ -360,68 +323,38 @@ public final class ResourceCourseManager {
         return normalize(clamp(value));
     }
 
-    private static Map<ResourceLocation, BigDecimal> generateTargetMultipliers(Set<ResourceLocation> resources, Random random) {
-        Map<ResourceLocation, BigDecimal> result = standardMultipliers(resources);
-        List<ResourceLocation> shuffled = new ArrayList<>(resources);
-        Collections.shuffle(shuffled, random);
+    private static Map<Integer, BigDecimal> generateTargetMultipliers(
+            long seed,
+            long courseIndex,
+            List<StarDefinitionManager.ActiveStar> stars
+    ) {
+        Map<Integer, BigDecimal> result = new LinkedHashMap<>();
 
-        if (shuffled.isEmpty()) {
-            return result;
-        }
-
-        if (shuffled.size() == 1) {
-            result.put(shuffled.get(0), normalize(randomBetween(random, MIN_MULTIPLIER, MAX_MULTIPLIER)));
-            return result;
-        }
-
-        double strength = 0.75D + (random.nextDouble() * 0.25D);
-        BigDecimal lowOutlier = BigDecimal.ONE.subtract(new BigDecimal("0.9").multiply(BigDecimal.valueOf(strength)));
-        BigDecimal highOutlier = BigDecimal.ONE.add(BigDecimal.valueOf(strength));
-
-        if (random.nextBoolean()) {
-            result.put(shuffled.get(0), normalize(clamp(lowOutlier)));
-            result.put(shuffled.get(1), normalize(clamp(highOutlier)));
-        } else {
-            result.put(shuffled.get(0), normalize(clamp(highOutlier)));
-            result.put(shuffled.get(1), normalize(clamp(lowOutlier)));
-        }
-
-        int availableOthers = Math.max(0, shuffled.size() - 2);
-        int otherAffected = Math.min(availableOthers, 4 + random.nextInt(5));
-        int lowSideCount = otherAffected / 2;
-        int highSideCount = otherAffected - lowSideCount;
-
-        if (random.nextBoolean()) {
-            int swap = lowSideCount;
-            lowSideCount = highSideCount;
-            highSideCount = swap;
-        }
-
-        BigDecimal lowMaxDistance = BigDecimal.ONE.subtract(lowOutlier).multiply(new BigDecimal("0.85"));
-        BigDecimal highMaxDistance = highOutlier.subtract(BigDecimal.ONE).multiply(new BigDecimal("0.85"));
-        int index = 2;
-
-        for (int i = 0; i < lowSideCount && index < shuffled.size(); i++, index++) {
-            BigDecimal distance = randomDistance(random, lowMaxDistance);
-            result.put(shuffled.get(index), normalize(clamp(BigDecimal.ONE.subtract(distance))));
-        }
-
-        for (int i = 0; i < highSideCount && index < shuffled.size(); i++, index++) {
-            BigDecimal distance = randomDistance(random, highMaxDistance);
-            result.put(shuffled.get(index), normalize(clamp(BigDecimal.ONE.add(distance))));
+        for (StarDefinitionManager.ActiveStar star : stars) {
+            Random random = randomFor(seed, courseIndex, 0x535441525f4d554cL ^ ((long) star.index() * 0x9E3779B97F4A7C15L));
+            result.put(star.index(), normalize(targetMultiplierForStar(random)));
         }
 
         return result;
     }
 
-    private static BigDecimal randomDistance(Random random, BigDecimal maxDistance) {
-        BigDecimal minimum = new BigDecimal("0.05");
+    private static BigDecimal targetMultiplierForStar(Random random) {
+        double roll = random.nextDouble();
+        BigDecimal min;
+        BigDecimal max;
 
-        if (maxDistance.compareTo(minimum) <= 0) {
-            return maxDistance.max(BigDecimal.ZERO);
+        if (roll < 0.18D) {
+            min = MIN_MULTIPLIER;
+            max = new BigDecimal("0.35");
+        } else if (roll < 0.36D) {
+            min = new BigDecimal("1.65");
+            max = MAX_MULTIPLIER;
+        } else {
+            min = new BigDecimal("0.72");
+            max = new BigDecimal("1.35");
         }
 
-        return minimum.add(maxDistance.subtract(minimum).multiply(BigDecimal.valueOf(random.nextDouble())));
+        return randomBetween(random, min, max);
     }
 
     private static long randomDurationTicks(Random random) {
@@ -474,12 +407,21 @@ public final class ResourceCourseManager {
         return ResourceLocation.fromNamespaceAndPath("minecraft", path);
     }
 
+    public record StarCourseView(
+            int index,
+            String name,
+            List<String> configuredResources,
+            List<String> activeResources,
+            BigDecimal multiplier
+    ) {
+    }
+
     private record CourseSnapshot(
             long courseIndex,
             long dayTime,
             long courseStartTick,
             long courseEndTick,
-            Map<ResourceLocation, BigDecimal> currentMultipliers
+            Map<Integer, BigDecimal> currentMultipliers
     ) {
     }
 }

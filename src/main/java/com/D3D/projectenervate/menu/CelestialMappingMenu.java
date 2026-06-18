@@ -40,6 +40,7 @@ public class CelestialMappingMenu extends AbstractContainerMenu {
         buffer.writeVarInt(bodies.size());
 
         for (CelestialBodyView body : bodies) {
+            buffer.writeVarInt(body.starId());
             buffer.writeUtf(body.resourceId());
             buffer.writeUtf(body.celestialName());
             buffer.writeDouble(body.multiplier());
@@ -52,6 +53,7 @@ public class CelestialMappingMenu extends AbstractContainerMenu {
 
         for (int i = 0; i < size; i++) {
             result.add(new CelestialBodyView(
+                    buffer.readVarInt(),
                     buffer.readUtf(),
                     buffer.readUtf(),
                     buffer.readDouble()
@@ -62,6 +64,7 @@ public class CelestialMappingMenu extends AbstractContainerMenu {
     }
 
     public record CelestialBodyView(
+            int starId,
             String resourceId,
             String celestialName,
             double multiplier
