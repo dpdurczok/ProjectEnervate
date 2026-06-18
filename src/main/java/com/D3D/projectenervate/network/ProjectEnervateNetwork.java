@@ -20,5 +20,11 @@ public final class ProjectEnervateNetwork {
                 CelestialCourseSyncPayload.STREAM_CODEC,
                 CelestialCourseSyncPayload::handle
         );
+
+        registrar.playToClient(
+                TransmutationStorageMessagePayload.TYPE,
+                TransmutationStorageMessagePayload.STREAM_CODEC,
+                TransmutationStorageMessagePayload::handle
+        );
     }
 }

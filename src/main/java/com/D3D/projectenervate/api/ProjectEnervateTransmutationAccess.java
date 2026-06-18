@@ -9,4 +9,8 @@ public interface ProjectEnervateTransmutationAccess {
     boolean projectenervate$canAcceptEmc(BigInteger value);
 
     boolean projectenervate$canStoreEmcHolder(ItemStack stack);
+
+    boolean projectenervate$hasAnyEmcHolder();
+
+    void projectenervate$showStorageMessage(String message);
 }

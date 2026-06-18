@@ -53,7 +53,9 @@
     "BlockGetDropsCreateEmcMixin",
     "PlayerCelestialScopeMixin"
   ],
-  "client": [],
+  "client": [
+    "GUITransmutationStorageMessageMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

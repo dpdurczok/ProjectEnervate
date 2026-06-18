@@ -1,8 +1,6 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
-import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
-import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import com.D3D.projectenervate.emc.TransmutationBurnHelper;
 import moze_intel.projecte.gameObjs.container.TransmutationContainer;
 import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
@@ -63,11 +61,6 @@ public abstract class TransmutationContainerMixin {
             return;
         }
 
-        if (ProjectEnervateSourceHelper.hasKnownSource(slotStack)
-                && !AdaptiveEmcHelper.hasAdaptiveValue(slotStack)) {
-            return;
-        }
-
         projectenervate$burnShiftClickedStack(slot, slotStack, cir);
     }
 
@@ -77,6 +70,10 @@ public abstract class TransmutationContainerMixin {
             int slotIndex,
             CallbackInfoReturnable<ItemStack> cir
     ) {
+        if (cir.isCancelled()) {
+            return;
+        }
+
         if (!com.D3D.projectenervate.compat.ProjectEnervateCompat.isMouseTweaksLoaded()) {
             return;
         }

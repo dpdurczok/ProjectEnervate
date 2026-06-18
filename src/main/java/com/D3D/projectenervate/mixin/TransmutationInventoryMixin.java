@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.ProjectEnervateConfig;
+import com.D3D.projectenervate.network.TransmutationStorageMessagePayload;
 import com.D3D.projectenervate.api.ProjectEnervateTransmutationAccess;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -16,6 +17,7 @@ import moze_intel.projecte.utils.PlayerHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -151,6 +153,30 @@ public abstract class TransmutationInventoryMixin implements ProjectEnervateTran
         }
 
         return false;
+    }
+
+    @Override
+    public boolean projectenervate$hasAnyEmcHolder() {
+        for (int slotIndex = 0; slotIndex < inputLocks.getSlots(); slotIndex++) {
+            if (slotIndex == PROJECTENERVATE_LOCK_INDEX) {
+                continue;
+            }
+
+            if (projectenervate$getEmcHolder(inputLocks.getStackInSlot(slotIndex)) != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public void projectenervate$showStorageMessage(String message) {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+
+        PacketDistributor.sendToPlayer(serverPlayer, new TransmutationStorageMessagePayload(message));
     }
 
     /**

@@ -14,6 +14,8 @@ import moze_intel.projecte.gameObjs.items.Tome;
 import net.minecraft.world.item.ItemStack;
 
 public final class TransmutationBurnHelper {
+    public static final String MESSAGE_ADD_KLEIN_STARS = "Add klein stars";
+    public static final String MESSAGE_STORAGE_FULL = "Storage Full";
 
     public record BurnResult(int itemsConsumed, boolean changed) {
         public static final BurnResult NONE = new BurnResult(0, false);
@@ -126,12 +128,16 @@ public final class TransmutationBurnHelper {
         BigInteger freeEmc = access.projectenervate$getFreeStarEmc();
 
         if (!zeroValueSource && freeEmc.signum() <= 0) {
+            showStorageBlockedMessage(access);
             return BurnResult.NONE;
         }
 
         int itemsThatFit = getMaxBurnableItems(freeEmc, sourceStack, requestedCount);
 
         if (itemsThatFit <= 0) {
+            if (!zeroValueSource) {
+                showStorageBlockedMessage(access);
+            }
             return BurnResult.NONE;
         }
 
@@ -193,6 +199,9 @@ public final class TransmutationBurnHelper {
         BigInteger starValue = getStackBurnValue(sourceStack, 1);
 
         if (starValue.signum() <= 0 || freeEmc.compareTo(starValue) < 0) {
+            if (storedEmc > 0 || starValue.signum() > 0) {
+                showStorageBlockedMessage(access);
+            }
             return new BurnResult(0, changed);
         }
 
@@ -204,6 +213,19 @@ public final class TransmutationBurnHelper {
         sourceStack.shrink(1);
 
         return new BurnResult(1, true);
+    }
+
+    private static void showStorageBlockedMessage(ProjectEnervateTransmutationAccess access) {
+        if (!ProjectEnervateConfig.capMaxEmcToKleinStars()) {
+            return;
+        }
+
+        if (!access.projectenervate$hasAnyEmcHolder()) {
+            access.projectenervate$showStorageMessage(MESSAGE_ADD_KLEIN_STARS);
+            return;
+        }
+
+        access.projectenervate$showStorageMessage(MESSAGE_STORAGE_FULL);
     }
 
     private static boolean isZeroValueBurn(ItemStack stack) {
