@@ -14,5 +14,11 @@ public final class ProjectEnervateNetwork {
                 EmcAssignmentApplyPayload.STREAM_CODEC,
                 EmcAssignmentApplyPayload::handle
         );
+
+        registrar.playToClient(
+                CelestialCourseSyncPayload.TYPE,
+                CelestialCourseSyncPayload.STREAM_CODEC,
+                CelestialCourseSyncPayload::handle
+        );
     }
 }

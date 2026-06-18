@@ -50,8 +50,10 @@
     "CreateSawBlockEntityMixin",
     "CreateBlockBreakingKineticBlockEntityMixin",
     "CreateDrillBlockEntityMixin",
-    "BlockGetDropsCreateEmcMixin"
+    "BlockGetDropsCreateEmcMixin",
+    "PlayerCelestialScopeMixin"
   ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

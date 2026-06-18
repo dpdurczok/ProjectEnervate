@@ -5,6 +5,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
 
 public final class ProjectEnervateClientEvents {
     private ProjectEnervateClientEvents() {
@@ -17,5 +18,10 @@ public final class ProjectEnervateClientEvents {
 
     public static void registerConfigScreen(ModContainer modContainer) {
         modContainer.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+    }
+
+    public static void registerClientRuntimeEvents() {
+        NeoForge.EVENT_BUS.addListener(CelestialSkyOverlay::onRenderLevelStage);
+        NeoForge.EVENT_BUS.addListener(CelestialScopeHudOverlay::onRenderGui);
     }
 }

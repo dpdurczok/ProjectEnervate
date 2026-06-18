@@ -2,6 +2,7 @@ package com.D3D.projectenervate.registry;
 
 import com.D3D.projectenervate.ProjectEnervate;
 import com.D3D.projectenervate.item.CelestialMappingItem;
+import com.D3D.projectenervate.item.CelestialScopeItem;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -22,6 +23,11 @@ public final class ProjectEnervateItems {
     public static final DeferredHolder<Item, CelestialMappingItem> CELESTIAL_MAPPING = ITEMS.register(
             "celestial_mapping",
             () -> new CelestialMappingItem(new Item.Properties().stacksTo(1))
+    );
+
+    public static final DeferredHolder<Item, CelestialScopeItem> CELESTIAL_SCOPE = ITEMS.register(
+            "celestial_scope",
+            () -> new CelestialScopeItem(new Item.Properties().stacksTo(1))
     );
 
     private ProjectEnervateItems() {

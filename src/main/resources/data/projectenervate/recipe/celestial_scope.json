@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " R ",
+    "LSG",
+    " C "
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "L": {
+      "item": "minecraft:lapis_lazuli"
+    },
+    "S": {
+      "item": "minecraft:spyglass"
+    },
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "C": {
+      "item": "minecraft:copper_ingot"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "projectenervate:celestial_scope"
+  }
+}

@@ -2,6 +2,7 @@ package com.D3D.projectenervate;
 
 import com.D3D.projectenervate.client.AdaptiveEmcTooltipEvents;
 import com.D3D.projectenervate.client.ProjectEnervateClientEvents;
+import com.D3D.projectenervate.celestial.CelestialCourseSyncEvents;
 import com.D3D.projectenervate.command.ProjectEnervateCommands;
 import com.D3D.projectenervate.network.ProjectEnervateNetwork;
 import com.D3D.projectenervate.registry.ProjectEnervateBlockEntities;
@@ -44,6 +45,7 @@ public final class ProjectEnervate {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ProjectEnervateClientEvents::registerScreens);
             ProjectEnervateClientEvents.registerConfigScreen(modContainer);
+            ProjectEnervateClientEvents.registerClientRuntimeEvents();
         }
 
         NeoForge.EVENT_BUS.addListener(ProjectEnervateCommands::registerCommands);
@@ -55,6 +57,7 @@ public final class ProjectEnervate {
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onPistonPre);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onPistonPost);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onLevelTickPost);
+        NeoForge.EVENT_BUS.addListener(CelestialCourseSyncEvents::onLevelTickPost);
         NeoForge.EVENT_BUS.addListener(PlacedBlockAdaptiveEmcEvents::onPlayerLoggedOut);
 
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, KnownSourceEvents::onBlockDrops);
@@ -64,6 +67,7 @@ public final class ProjectEnervate {
     private static void addCreativeTabItems(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ProjectEnervateItems.CELESTIAL_MAPPING.get());
+            event.accept(ProjectEnervateItems.CELESTIAL_SCOPE.get());
         }
 
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {

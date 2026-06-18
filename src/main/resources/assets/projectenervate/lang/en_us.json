@@ -10,5 +10,7 @@
   "projectenervate.configuration.cap_max_emc_to_klein_stars": "Cap Max EMC to Klein Stars",
   "projectenervate.configuration.enable_random_courses": "Enable Random Courses",
   "projectenervate.configuration.random_course_resources": "Random Course Resources",
-  "projectenervate.configuration.choose_base_emc_if_lower": "Choose Base EMC If Lower"
+  "projectenervate.configuration.choose_base_emc_if_lower": "Choose Base EMC If Lower",
+  "item.projectenervate.celestial_scope": "Celestial Scope",
+  "tooltip.projectenervate.celestial_scope": "Gaze Upon the Stars."
 }
