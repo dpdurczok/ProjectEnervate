@@ -1,18 +1,27 @@
 package com.D3D.projectenervate.client;
 
+import com.D3D.projectenervate.ProjectEnervate;
 import com.D3D.projectenervate.registry.ProjectEnervateItems;
+import com.mojang.blaze3d.systems.RenderSystem;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 import java.util.Optional;
 import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 
 public final class CelestialScopeHudOverlay {
+    private static final ResourceLocation LAYER_ID = ResourceLocation.fromNamespaceAndPath(
+            ProjectEnervate.MOD_ID,
+            "celestial_scope_tooltip"
+    );
+
     private static final DecimalFormat MULTIPLIER_FORMAT = new DecimalFormat(
             "0.##",
             DecimalFormatSymbols.getInstance(Locale.US)
@@ -26,7 +35,19 @@ public final class CelestialScopeHudOverlay {
     private CelestialScopeHudOverlay() {
     }
 
-    public static void onRenderGui(RenderGuiEvent.Post event) {
+    public static void registerGuiLayer(RegisterGuiLayersEvent event) {
+        event.registerAboveAll(LAYER_ID, CelestialScopeHudOverlay::renderGuiLayer);
+    }
+
+    private static void renderGuiLayer(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+        renderScopeTooltip(guiGraphics, deltaTracker.getGameTimeDeltaPartialTick(false));
+    }
+
+    public static void renderAfterSpyglassOverlay(GuiGraphics guiGraphics) {
+        renderScopeTooltip(guiGraphics, 0.0F);
+    }
+
+    private static void renderScopeTooltip(GuiGraphics guiGraphics, float partialTick) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null || minecraft.level == null) {
             return;
@@ -41,10 +62,8 @@ public final class CelestialScopeHudOverlay {
             return;
         }
 
-        GuiGraphics guiGraphics = event.getGuiGraphics();
         int width = minecraft.getWindow().getGuiScaledWidth();
         int height = minecraft.getWindow().getGuiScaledHeight();
-        float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
 
         Optional<CelestialSkyOverlay.ScopedStarHit> hit = CelestialSkyOverlay.findScopedStarHit(
                 minecraft,
@@ -54,7 +73,38 @@ public final class CelestialScopeHudOverlay {
                 partialTick
         );
 
-        hit.ifPresent(star -> renderStarTooltip(guiGraphics, minecraft.font, star, width, height));
+        if (hit.isEmpty()) {
+            return;
+        }
+
+        drawTooltipSafely(guiGraphics, minecraft.font, hit.get(), width, height);
+    }
+
+    private static void drawTooltipSafely(
+            GuiGraphics guiGraphics,
+            Font font,
+            CelestialSkyOverlay.ScopedStarHit hit,
+            int width,
+            int height
+    ) {
+        guiGraphics.flush();
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().translate(0.0F, 0.0F, 1000.0F);
+        renderStarTooltip(guiGraphics, font, hit, width, height);
+        guiGraphics.pose().popPose();
+
+        guiGraphics.flush();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.depthMask(true);
+        RenderSystem.disableDepthTest();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
     }
 
     private static void renderStarTooltip(

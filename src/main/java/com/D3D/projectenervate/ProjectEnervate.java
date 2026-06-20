@@ -44,6 +44,7 @@ public final class ProjectEnervate {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ProjectEnervateClientEvents::registerScreens);
+            modEventBus.addListener(ProjectEnervateClientEvents::registerGuiLayers);
             ProjectEnervateClientEvents.registerConfigScreen(modContainer);
             ProjectEnervateClientEvents.registerClientRuntimeEvents();
         }

@@ -17,7 +17,9 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
@@ -65,6 +67,7 @@ public final class CelestialSkyOverlay {
      * The star is rendered on an artificial sky shell around the camera, so camera translation causes no parallax.
      */
     private static final double SKY_DISTANCE = 100.0D;
+    private static final double TOOLTIP_OCCLUSION_RAY_DISTANCE = 512.0D;
 
     private static final double MIN_MOON_OFFSET_DEGREES = 10.0D;
     private static final double MAX_MOON_OFFSET_DEGREES = 78.0D;
@@ -126,6 +129,10 @@ public final class CelestialSkyOverlay {
             double ndcY = worldDirection.dot(up) / (forward * verticalTan);
 
             if (Math.abs(ndcX) > SCOPED_SCREEN_MARGIN || Math.abs(ndcY) > SCOPED_SCREEN_MARGIN) {
+                continue;
+            }
+
+            if (!hasClearSkyLineOfSight(minecraft, camera, worldDirection)) {
                 continue;
             }
 
@@ -196,7 +203,9 @@ public final class CelestialSkyOverlay {
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         RenderSystem.setShaderTexture(0, STAR_TEXTURE);
 
@@ -246,6 +255,7 @@ public final class CelestialSkyOverlay {
         BufferUploader.drawWithShader(buffer.buildOrThrow());
 
         RenderSystem.depthMask(true);
+        RenderSystem.enableDepthTest();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableBlend();
     }
@@ -276,6 +286,29 @@ public final class CelestialSkyOverlay {
 
     private static Vec3 fromVector3f(Vector3f vector) {
         return new Vec3(vector.x(), vector.y(), vector.z());
+    }
+
+    private static boolean hasClearSkyLineOfSight(Minecraft minecraft, Camera camera, Vec3 worldDirection) {
+        if (minecraft == null || minecraft.level == null || minecraft.player == null || camera == null) {
+            return false;
+        }
+
+        Vec3 normalizedDirection = worldDirection.normalize();
+        if (normalizedDirection.lengthSqr() <= 0.000001D) {
+            return false;
+        }
+
+        Vec3 start = camera.getPosition();
+        Vec3 end = start.add(normalizedDirection.scale(TOOLTIP_OCCLUSION_RAY_DISTANCE));
+        HitResult hit = minecraft.level.clip(new ClipContext(
+                start,
+                end,
+                ClipContext.Block.VISUAL,
+                ClipContext.Fluid.NONE,
+                minecraft.player
+        ));
+
+        return hit.getType() == HitResult.Type.MISS;
     }
 
     private static double clamp(double value, double min, double max) {

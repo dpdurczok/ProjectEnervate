@@ -54,7 +54,8 @@
     "PlayerCelestialScopeMixin"
   ],
   "client": [
-    "GUITransmutationStorageMessageMixin"
+    "GUITransmutationStorageMessageMixin",
+    "GuiSpyglassOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1
