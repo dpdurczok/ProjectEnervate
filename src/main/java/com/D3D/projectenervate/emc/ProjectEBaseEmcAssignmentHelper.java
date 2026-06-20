@@ -47,6 +47,7 @@ public final class ProjectEBaseEmcAssignmentHelper {
 
         CustomEMCParser.addToFile(targetNss, emc);
         CustomEMCParser.flush(player.registryAccess());
+        AdaptiveEmcOutputHelper.clearBaseEmcCache();
         updateLiveMap(targetInfo, emc);
         ProjectEnervateSourceHelper.clearProjectEnervateData(targetStack);
         ProjectEnervateSourceHelper.markVerifiedIfBaseEmc(targetStack);

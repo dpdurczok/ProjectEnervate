@@ -16,6 +16,12 @@ public final class ProjectEnervateConfig {
     private static final String STARS_SECTION = "[stars]";
     private static final String STARS_KEY = "Definitions";
 
+    private static final Object STARS_CACHE_LOCK = new Object();
+    private static volatile List<String> cachedStars;
+    private static volatile long cachedStarsModifiedTime = Long.MIN_VALUE;
+    private static volatile long cachedStarsSize = Long.MIN_VALUE;
+    private static volatile long starsRevision;
+
     private static final List<String> DEFAULT_STARS = List.of(
             "Carbona|minecraft:coal,#c:ores/coal,#c:storage_blocks/coal",
             "Ferrum|minecraft:raw_iron,minecraft:iron_ingot,minecraft:iron_nugget,#c:raw_materials/iron,#c:raw_blocks/iron,#c:ores/iron,#c:ingots/iron,#c:nuggets/iron,#c:dusts/iron,#c:plates/iron,#c:storage_blocks/iron",
@@ -157,11 +163,54 @@ public final class ProjectEnervateConfig {
     public static List<String> stars() {
         Path path = starsConfigFilePath();
         ensureStarsConfigExists(path);
-        return readStarsFromPhysicalConfig(path);
+
+        long modifiedTime = fileModifiedTime(path);
+        long fileSize = fileSize(path);
+        List<String> localCache = cachedStars;
+
+        if (localCache != null
+                && cachedStarsModifiedTime == modifiedTime
+                && cachedStarsSize == fileSize) {
+            return new ArrayList<>(localCache);
+        }
+
+        synchronized (STARS_CACHE_LOCK) {
+            modifiedTime = fileModifiedTime(path);
+            fileSize = fileSize(path);
+            localCache = cachedStars;
+
+            if (localCache != null
+                    && cachedStarsModifiedTime == modifiedTime
+                    && cachedStarsSize == fileSize) {
+                return new ArrayList<>(localCache);
+            }
+
+            List<String> parsed = readStarsFromPhysicalConfig(path);
+            cachedStars = List.copyOf(parsed);
+            cachedStarsModifiedTime = modifiedTime;
+            cachedStarsSize = fileSize;
+            starsRevision++;
+            com.D3D.projectenervate.emc.StarDefinitionManager.invalidateCaches();
+            return new ArrayList<>(cachedStars);
+        }
     }
 
     public static void setStars(List<String> entries) {
-        saveStarsToPhysicalConfig(new ArrayList<>(entries));
+        List<String> safeEntries = new ArrayList<>(entries);
+        saveStarsToPhysicalConfig(safeEntries);
+
+        synchronized (STARS_CACHE_LOCK) {
+            Path path = starsConfigFilePath();
+            cachedStars = List.copyOf(safeEntries);
+            cachedStarsModifiedTime = fileModifiedTime(path);
+            cachedStarsSize = fileSize(path);
+            starsRevision++;
+            com.D3D.projectenervate.emc.StarDefinitionManager.invalidateCaches();
+        }
+    }
+
+    public static long starsRevision() {
+        return starsRevision;
     }
 
     public static Path starsConfigFilePath() {
@@ -170,6 +219,22 @@ public final class ProjectEnervateConfig {
 
     public static Path configFilePath() {
         return starsConfigFilePath();
+    }
+
+    private static long fileModifiedTime(Path path) {
+        try {
+            return Files.exists(path) ? Files.getLastModifiedTime(path).toMillis() : Long.MIN_VALUE;
+        } catch (IOException exception) {
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private static long fileSize(Path path) {
+        try {
+            return Files.exists(path) ? Files.size(path) : Long.MIN_VALUE;
+        } catch (IOException exception) {
+            return Long.MIN_VALUE;
+        }
     }
 
     private static void ensureStarsConfigExists(Path path) {

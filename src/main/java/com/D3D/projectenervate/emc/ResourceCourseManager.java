@@ -22,6 +22,8 @@ public final class ResourceCourseManager {
     private static final BigDecimal COURSE_HOLD_START = new BigDecimal("0.8");
     private static final long MINECRAFT_DAY_TICKS = 24000L;
     private static final int MAX_COURSE_SCAN_COUNT = 1_000_000;
+    private static final Object SNAPSHOT_CACHE_LOCK = new Object();
+    private static volatile CachedCourseSnapshot cachedCourseSnapshot;
 
     private ResourceCourseManager() {
     }
@@ -82,7 +84,8 @@ public final class ResourceCourseManager {
             return false;
         }
 
-        CourseSnapshot snapshot = currentSnapshot(level, StarDefinitionManager.activeStars());
+        List<StarDefinitionManager.ActiveStar> activeStars = StarDefinitionManager.activeStars();
+        CourseSnapshot snapshot = currentSnapshot(level, activeStars);
         BigDecimal multiplier = snapshot.currentMultipliers.getOrDefault(star.index(), STANDARD_MULTIPLIER);
         BigDecimal proposedStackEmc = baseStackEmc.multiply(multiplier);
 
@@ -184,6 +187,32 @@ public final class ResourceCourseManager {
     private static CourseSnapshot currentSnapshot(ServerLevel level, List<StarDefinitionManager.ActiveStar> stars) {
         long seed = resolveCourseSeed(level);
         long dayTime = resolveCourseDayTime(level);
+        long starsRevision = ProjectEnervateConfig.starsRevision();
+        CachedCourseSnapshot localCache = cachedCourseSnapshot;
+
+        if (localCache != null
+                && localCache.seed() == seed
+                && localCache.dayTime() == dayTime
+                && localCache.starsRevision() == starsRevision) {
+            return localCache.snapshot();
+        }
+
+        synchronized (SNAPSHOT_CACHE_LOCK) {
+            localCache = cachedCourseSnapshot;
+            if (localCache != null
+                    && localCache.seed() == seed
+                    && localCache.dayTime() == dayTime
+                    && localCache.starsRevision() == starsRevision) {
+                return localCache.snapshot();
+            }
+
+            CourseSnapshot snapshot = computeSnapshot(seed, dayTime, stars);
+            cachedCourseSnapshot = new CachedCourseSnapshot(seed, dayTime, starsRevision, snapshot);
+            return snapshot;
+        }
+    }
+
+    private static CourseSnapshot computeSnapshot(long seed, long dayTime, List<StarDefinitionManager.ActiveStar> stars) {
         long courseStartTick = 0L;
         long courseIndex = 0L;
         Map<Integer, BigDecimal> startMultipliers = standardMultipliers(stars);
@@ -413,6 +442,14 @@ public final class ResourceCourseManager {
             List<String> configuredResources,
             List<String> activeResources,
             BigDecimal multiplier
+    ) {
+    }
+
+    private record CachedCourseSnapshot(
+            long seed,
+            long dayTime,
+            long starsRevision,
+            CourseSnapshot snapshot
     ) {
     }
 

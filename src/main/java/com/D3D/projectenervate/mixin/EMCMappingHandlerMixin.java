@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.ProjectEnervateConfig;
+import com.D3D.projectenervate.emc.AdaptiveEmcOutputHelper;
 import com.D3D.projectenervate.emc.BacktrackedBaseEmcMapper;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import java.util.Set;
@@ -21,6 +22,7 @@ public abstract class EMCMappingHandlerMixin {
             Object2LongMap<ItemInfo> data,
             CallbackInfoReturnable<Integer> cir
     ) {
+        AdaptiveEmcOutputHelper.clearBaseEmcCache();
         Set<ItemInfo> customRemovedItems = BacktrackedBaseEmcMapper.collectCustomRemovedItems();
 
         projectenervate$applyCustomEmc(data);

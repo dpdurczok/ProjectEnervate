@@ -4,9 +4,12 @@ import com.D3D.projectenervate.ProjectEnervateConfig;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -20,45 +23,24 @@ import net.minecraft.world.item.Items;
 public final class StarDefinitionManager {
     private static final String ENTRY_SEPARATOR = "|";
     private static final String RESOURCE_SEPARATOR = ",";
+    private static final Object CACHE_LOCK = new Object();
+    private static volatile StarCache cachedStarData;
 
     private StarDefinitionManager() {
     }
 
-    public static List<StarDefinition> configuredStars() {
-        List<String> entries = ProjectEnervateConfig.stars();
-        List<StarDefinition> result = new ArrayList<>();
-
-        for (int i = 0; i < entries.size(); i++) {
-            Optional<StarDefinition> parsed = parseDefinition(i, entries.get(i));
-            parsed.ifPresent(result::add);
+    public static void invalidateCaches() {
+        synchronized (CACHE_LOCK) {
+            cachedStarData = null;
         }
+    }
 
-        return result;
+    public static List<StarDefinition> configuredStars() {
+        return cache().configuredStars();
     }
 
     public static List<ActiveStar> activeStars() {
-        List<ActiveStar> result = new ArrayList<>();
-
-        for (StarDefinition definition : configuredStars()) {
-            List<String> activeResources = new ArrayList<>();
-
-            for (String resource : definition.resources()) {
-                if (isSelectorActive(resource)) {
-                    activeResources.add(resource);
-                }
-            }
-
-            if (!activeResources.isEmpty()) {
-                result.add(new ActiveStar(
-                        definition.index(),
-                        definition.name(),
-                        definition.resources(),
-                        List.copyOf(activeResources)
-                ));
-            }
-        }
-
-        return result;
+        return cache().activeStars();
     }
 
     public static ActiveStar findActiveStarForStack(ItemStack stack, ResourceLocation canonicalResource) {
@@ -66,15 +48,17 @@ public final class StarDefinitionManager {
             return null;
         }
 
-        for (ActiveStar star : activeStars()) {
-            for (String resource : star.configuredResources()) {
-                if (selectorMatchesStack(resource, stack, canonicalResource)) {
-                    return star;
-                }
+        StarCache cache = cache();
+        ResourceLocation stackId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+
+        if (stackId != null) {
+            ActiveStar stackStar = cache.itemToActiveStar().get(stackId);
+            if (stackStar != null) {
+                return stackStar;
             }
         }
 
-        return null;
+        return canonicalResource == null ? null : cache.itemToActiveStar().get(canonicalResource);
     }
 
     public static List<String> configuredStarNames() {
@@ -240,38 +224,132 @@ public final class StarDefinitionManager {
             return List.of();
         }
 
-        Set<ResourceLocation> result = new LinkedHashSet<>();
+        return cache().activeConcreteItemsByStarIndex().getOrDefault(star.index(), List.of());
+    }
 
-        for (String resource : star.activeResources()) {
-            Selector selector = parseSelector(resource);
-            if (selector == null) {
-                continue;
+    private static StarCache cache() {
+        List<String> entries = ProjectEnervateConfig.stars();
+        long revision = ProjectEnervateConfig.starsRevision();
+        StarCache localCache = cachedStarData;
+
+        if (localCache != null && localCache.revision() == revision) {
+            return localCache;
+        }
+
+        synchronized (CACHE_LOCK) {
+            localCache = cachedStarData;
+            if (localCache != null && localCache.revision() == revision) {
+                return localCache;
             }
 
-            if (selector.tag()) {
-                TagKey<Item> tag = TagKey.create(Registries.ITEM, selector.id());
-                for (Item item : BuiltInRegistries.ITEM) {
-                    if (item == Items.AIR) {
-                        continue;
-                    }
+            StarCache rebuilt = buildCache(revision, entries);
+            cachedStarData = rebuilt;
+            return rebuilt;
+        }
+    }
 
-                    ItemStack stack = new ItemStack(item);
-                    if (stack.is(tag) && AdaptiveEmcOutputHelper.getBaseSingleEmc(stack).signum() > 0) {
-                        ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
-                        if (id != null) {
-                            result.add(id);
-                        }
-                    }
+    private static StarCache buildCache(long revision, List<String> entries) {
+        List<StarDefinition> configured = new ArrayList<>();
+
+        for (int i = 0; i < entries.size(); i++) {
+            Optional<StarDefinition> parsed = parseDefinition(i, entries.get(i));
+            parsed.ifPresent(configured::add);
+        }
+
+        List<ActiveStar> activeStars = new ArrayList<>();
+        Map<ResourceLocation, ActiveStar> itemToActiveStar = new LinkedHashMap<>();
+        Map<Integer, List<ResourceLocation>> activeConcreteItemsByStarIndex = new LinkedHashMap<>();
+        Map<String, Boolean> selectorActiveState = new HashMap<>();
+
+        for (StarDefinition definition : configured) {
+            List<String> activeResources = new ArrayList<>();
+            Set<ResourceLocation> concreteItems = new LinkedHashSet<>();
+
+            for (String resource : definition.resources()) {
+                String cleaned = cleanResource(resource);
+                Set<ResourceLocation> matches = concreteItemsForSelector(cleaned);
+                boolean active = !matches.isEmpty();
+                selectorActiveState.put(cleaned, active);
+
+                if (active) {
+                    activeResources.add(cleaned);
+                    concreteItems.addAll(matches);
                 }
-            } else if (BuiltInRegistries.ITEM.containsKey(selector.id())) {
-                Item item = BuiltInRegistries.ITEM.get(selector.id());
-                if (item != Items.AIR && AdaptiveEmcOutputHelper.getBaseSingleEmc(new ItemStack(item)).signum() > 0) {
-                    result.add(selector.id());
+            }
+
+            if (!activeResources.isEmpty()) {
+                ActiveStar activeStar = new ActiveStar(
+                        definition.index(),
+                        definition.name(),
+                        definition.resources(),
+                        List.copyOf(activeResources)
+                );
+                activeStars.add(activeStar);
+                activeConcreteItemsByStarIndex.put(definition.index(), List.copyOf(concreteItems));
+
+                for (ResourceLocation itemId : concreteItems) {
+                    itemToActiveStar.putIfAbsent(itemId, activeStar);
                 }
             }
         }
 
-        return List.copyOf(result);
+        return new StarCache(
+                revision,
+                List.copyOf(configured),
+                List.copyOf(activeStars),
+                Map.copyOf(itemToActiveStar),
+                copyConcreteMap(activeConcreteItemsByStarIndex),
+                Map.copyOf(selectorActiveState)
+        );
+    }
+
+    private static Map<Integer, List<ResourceLocation>> copyConcreteMap(Map<Integer, List<ResourceLocation>> source) {
+        Map<Integer, List<ResourceLocation>> result = new LinkedHashMap<>();
+        for (Map.Entry<Integer, List<ResourceLocation>> entry : source.entrySet()) {
+            result.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Set<ResourceLocation> concreteItemsForSelector(String rawSelector) {
+        Selector selector = parseSelector(rawSelector);
+
+        if (selector == null) {
+            return Set.of();
+        }
+
+        Set<ResourceLocation> result = new LinkedHashSet<>();
+
+        if (selector.tag()) {
+            TagKey<Item> tag = TagKey.create(Registries.ITEM, selector.id());
+
+            for (Item item : BuiltInRegistries.ITEM) {
+                if (item == Items.AIR) {
+                    continue;
+                }
+
+                ItemStack stack = new ItemStack(item);
+                if (stack.is(tag) && AdaptiveEmcOutputHelper.getBaseSingleEmc(stack).signum() > 0) {
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+                    if (id != null) {
+                        result.add(id);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        if (!BuiltInRegistries.ITEM.containsKey(selector.id())) {
+            return Set.of();
+        }
+
+        Item item = BuiltInRegistries.ITEM.get(selector.id());
+        if (item != Items.AIR && AdaptiveEmcOutputHelper.getBaseSingleEmc(new ItemStack(item)).signum() > 0) {
+            result.add(selector.id());
+        }
+
+        return result;
     }
 
     private static Optional<StarDefinition> parseDefinition(int index, String rawEntry) {
@@ -301,56 +379,8 @@ public final class StarDefinitionManager {
     }
 
     private static boolean isSelectorActive(String rawSelector) {
-        Selector selector = parseSelector(rawSelector);
-
-        if (selector == null) {
-            return false;
-        }
-
-        if (selector.tag()) {
-            TagKey<Item> tag = TagKey.create(Registries.ITEM, selector.id());
-
-            for (Item item : BuiltInRegistries.ITEM) {
-                if (item == Items.AIR) {
-                    continue;
-                }
-
-                ItemStack stack = new ItemStack(item);
-                if (stack.is(tag) && AdaptiveEmcOutputHelper.getBaseSingleEmc(stack).signum() > 0) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        if (!BuiltInRegistries.ITEM.containsKey(selector.id())) {
-            return false;
-        }
-
-        Item item = BuiltInRegistries.ITEM.get(selector.id());
-        return item != Items.AIR && AdaptiveEmcOutputHelper.getBaseSingleEmc(new ItemStack(item)).signum() > 0;
-    }
-
-    private static boolean selectorMatchesStack(String rawSelector, ItemStack stack, ResourceLocation canonicalResource) {
-        Selector selector = parseSelector(rawSelector);
-
-        if (selector == null || stack == null || stack.isEmpty()) {
-            return false;
-        }
-
-        if (selector.tag()) {
-            TagKey<Item> tag = TagKey.create(Registries.ITEM, selector.id());
-            if (stack.is(tag)) {
-                return true;
-            }
-
-            ItemStack canonicalStack = stackForItemId(canonicalResource);
-            return canonicalStack != null && canonicalStack.is(tag);
-        }
-
-        ResourceLocation stackId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return selector.id().equals(stackId) || selector.id().equals(canonicalResource);
+        String cleaned = cleanResource(rawSelector);
+        return cache().selectorActiveState().getOrDefault(cleaned, false);
     }
 
     private static ItemStack stackForItemId(ResourceLocation id) {
@@ -438,6 +468,16 @@ public final class StarDefinitionManager {
     }
 
     private record Selector(boolean tag, ResourceLocation id) {
+    }
+
+    private record StarCache(
+            long revision,
+            List<StarDefinition> configuredStars,
+            List<ActiveStar> activeStars,
+            Map<ResourceLocation, ActiveStar> itemToActiveStar,
+            Map<Integer, List<ResourceLocation>> activeConcreteItemsByStarIndex,
+            Map<String, Boolean> selectorActiveState
+    ) {
     }
 
     public record StarDefinition(

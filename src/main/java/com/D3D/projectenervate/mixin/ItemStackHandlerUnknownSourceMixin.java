@@ -1,6 +1,7 @@
 package com.D3D.projectenervate.mixin;
 
 import com.D3D.projectenervate.emc.AdaptiveEmcHelper;
+import com.D3D.projectenervate.emc.ProjectEnervateSourceHelper;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.spongepowered.asm.mixin.Mixin;
@@ -41,7 +42,15 @@ public abstract class ItemStackHandlerUnknownSourceMixin {
             return;
         }
 
-        projectenervate$slotBeforeInsert = getStackInSlot(slot).copy();
+        ItemStack existing = getStackInSlot(slot);
+        if (!ProjectEnervateSourceHelper.hasProjectEnervateData(existing)
+                && !ProjectEnervateSourceHelper.hasProjectEnervateData(stack)) {
+            projectenervate$slotBeforeInsert = ItemStack.EMPTY;
+            projectenervate$incomingBeforeInsert = ItemStack.EMPTY;
+            return;
+        }
+
+        projectenervate$slotBeforeInsert = existing.copy();
         projectenervate$incomingBeforeInsert = stack.copy();
     }
 

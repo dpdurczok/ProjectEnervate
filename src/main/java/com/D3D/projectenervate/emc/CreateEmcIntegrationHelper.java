@@ -7,7 +7,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -24,6 +26,7 @@ import net.neoforged.neoforge.items.IItemHandler;
  */
 public final class CreateEmcIntegrationHelper {
     private static final ThreadLocal<BlockBreakBudgetContext> ACTIVE_BLOCK_BREAK_BUDGET = new ThreadLocal<>();
+    private static final Map<FieldLookupKey, Optional<Field>> FIELD_CACHE = new ConcurrentHashMap<>();
 
     private CreateEmcIntegrationHelper() {
     }
@@ -233,21 +236,42 @@ public final class CreateEmcIntegrationHelper {
             return null;
         }
 
-        Class<?> type = owner.getClass();
-
-        while (type != null) {
-            try {
-                Field field = type.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field.get(owner);
-            } catch (NoSuchFieldException ignored) {
-                type = type.getSuperclass();
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                return null;
-            }
+        Optional<Field> field = cachedField(owner.getClass(), fieldName);
+        if (field.isEmpty()) {
+            return null;
         }
 
-        return null;
+        try {
+            return field.get().get(owner);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static Optional<Field> cachedField(Class<?> ownerType, String fieldName) {
+        return FIELD_CACHE.computeIfAbsent(new FieldLookupKey(ownerType, fieldName), key -> {
+            Class<?> type = key.ownerType();
+
+            while (type != null) {
+                try {
+                    Field field = type.getDeclaredField(key.fieldName());
+                    field.setAccessible(true);
+                    return Optional.of(field);
+                } catch (NoSuchFieldException ignored) {
+                    type = type.getSuperclass();
+                } catch (RuntimeException ignored) {
+                    return Optional.empty();
+                }
+            }
+
+            return Optional.empty();
+        });
+    }
+
+    private record FieldLookupKey(
+            Class<?> ownerType,
+            String fieldName
+    ) {
     }
 
     private record BlockBreakBudgetContext(
